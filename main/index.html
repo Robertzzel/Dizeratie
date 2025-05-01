@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <table id="data-table" border="1">
+        <thead>
+            <tr>
+                <th>SSID</th>
+                <th>BSSID</th>
+                <th>DISCONNECT</th>
+            </tr>
+        </thead>
+        <tbody id="table-body">
+            <!-- Rows will be dynamically added here -->
+        </tbody>
+    </table>
+    <button id="fetch-data">Fetch Data</button>
+</body>
+<script>
+    document.getElementById('fetch-data').addEventListener('click', async () => {
+        try {
+            console.log("fetching data...");
+            const response = await fetch('/scan');
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            console.log("parsing response to json...");
+            const data = await response.json();
+            
+            console.log("populating table...");
+            populate_table(data);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        }
+    });
+
+    function populate_table(json_data){
+        const tableBody = document.getElementById('table-body');
+        tableBody.innerHTML = ''; // Clear existing rows
+
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+
+            let td = document.createElement('td');
+            td.textContent = row.ssid;
+            tr.appendChild(td);
+
+            td = document.createElement('td');
+            td.textContent = row.bssid;
+            tr.appendChild(td);
+
+            tableBody.appendChild(tr);
+        });
+    }
+
+    async function disconnect(target_ssid){
+        const response = await fetch(`/disconnect?target=${target_ssid}`);
+    }
+</script>
+</html>
