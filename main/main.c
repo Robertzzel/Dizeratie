@@ -14,20 +14,26 @@
 #include <nvs_flash.h>
 #include "wifi_controller.h"
 #include "scanner.h"
-#include "state.h"
 #include "webserver.h"
-static state_t state = {0};
 
 void app_main(void)
     {
-    printf("app_main started\n");
-
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    state.event_loop_started = true;
     ESP_ERROR_CHECK(nvs_flash_init());
-    state.nvs_flash_initialized = true;
+    ESP_ERROR_CHECK(wifi_start());
 
-    ESP_ERROR_CHECK(wifi_init_start(&state));
+    wifi_config_t config = 
+    {
+        .ap = 
+        {
+            .ssid = "ESP32",
+            .ssid_len = strlen("ESP32"),
+            .password = "ESP32ESP32",
+            .max_connection = 2,
+            .authmode = WIFI_AUTH_WPA2_PSK
+        },
+    };
+    ESP_ERROR_CHECK(wifi_config(&config));
 
     start_webserver();
 }

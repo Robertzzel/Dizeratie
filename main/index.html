@@ -30,7 +30,7 @@
             }
             console.log("parsing response to json...");
             const data = await response.json();
-            
+            console.log("data: ", data)
             console.log("populating table...");
             populate_table(data);
         } catch (error) {
@@ -42,7 +42,7 @@
         const tableBody = document.getElementById('table-body');
         tableBody.innerHTML = ''; // Clear existing rows
 
-        data.forEach(row => {
+        json_data.forEach(row => {
             const tr = document.createElement('tr');
 
             let td = document.createElement('td');
@@ -53,12 +53,16 @@
             td.textContent = row.bssid;
             tr.appendChild(td);
 
+            td = document.createElement('td');
+            td.innerHTML = `<button onclick="disconnect('${row.bssid}')">disconnect</button>`;
+            tr.appendChild(td);
+
             tableBody.appendChild(tr);
         });
     }
 
-    async function disconnect(target_ssid){
-        const response = await fetch(`/disconnect?target=${target_ssid}`);
+    async function disconnect(target_bssid){
+        const response = await fetch(`/attack?bssid=${target_bssid}`);
     }
 </script>
 </html>

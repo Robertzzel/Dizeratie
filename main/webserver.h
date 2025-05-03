@@ -5,7 +5,75 @@
 
 static wifictl_ap_records_t ap_records = {0};
 
-const char html[] = "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Document</title></head><body><table id=\"data-table\" border=\"1\"><thead><tr><th>Column 1</th><th>Column 2</th><th>Column 3</th></tr></thead><tbody id=\"table-body\"></tbody></table><button id=\"fetch-data\">Fetch Data</button></body><script>document.getElementById('fetch-data').addEventListener('click',async()=>{try{console.log(\"fetching data...\");const response=await fetch('/scan');if(!response.ok){throw new Error('Network response was not ok');}console.log(\"parsing response to json...\");const data=await response.json();console.log(\"fetching data...\");const tableBody=document.getElementById('table-body');tableBody.innerHTML='';data.forEach(row=>{const tr=document.createElement('tr');let td=document.createElement('td');td.textContent=row.ssid;tr.appendChild(td);td=document.createElement('td');td.textContent=row.bssid;tr.appendChild(td);tableBody.appendChild(tr);});}catch(error){console.error('Error fetching data:',error);}});</script></html>";
+char* html = 
+"<!DOCTYPE html>\n"
+"<html lang=\"en\">\n"
+"<head>\n"
+"    <meta charset=\"UTF-8\">\n"
+"    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+"    <title>Document</title>\n"
+"</head>\n"
+"<body>\n"
+"    <table id=\"data-table\" border=\"1\">\n"
+"        <thead>\n"
+"            <tr>\n"
+"                <th>SSID</th>\n"
+"                <th>BSSID</th>\n"
+"                <th>DISCONNECT</th>\n"
+"            </tr>\n"
+"        </thead>\n"
+"        <tbody id=\"table-body\">\n"
+"            <!-- Rows will be dynamically added here -->\n"
+"        </tbody>\n"
+"    </table>\n"
+"    <button id=\"fetch-data\">Fetch Data</button>\n"
+"</body>\n"
+"<script>\n"
+"    document.getElementById('fetch-data').addEventListener('click', async () => {\n"
+"        try {\n"
+"            console.log(\"fetching data...\");\n"
+"            const response = await fetch('/scan');\n"
+"            if (!response.ok) {\n"
+"                throw new Error('Network response was not ok');\n"
+"            }\n"
+"            console.log(\"parsing response to json...\");\n"
+"            const data = await response.json();\n"
+"            console.log(\"data: \", data)\n"
+"            console.log(\"populating table...\");\n"
+"            populate_table(data);\n"
+"        } catch (error) {\n"
+"            console.error('Error fetching data:', error);\n"
+"        }\n"
+"    });\n"
+"\n"
+"    function populate_table(json_data){\n"
+"        const tableBody = document.getElementById('table-body');\n"
+"        tableBody.innerHTML = ''; // Clear existing rows\n"
+"\n"
+"        json_data.forEach(row => {\n"
+"            const tr = document.createElement('tr');\n"
+"\n"
+"            let td = document.createElement('td');\n"
+"            td.textContent = row.ssid;\n"
+"            tr.appendChild(td);\n"
+"\n"
+"            td = document.createElement('td');\n"
+"            td.textContent = row.bssid;\n"
+"            tr.appendChild(td);\n"
+"\n"
+"            td = document.createElement('td');\n"
+"            td.innerHTML = `<button onclick=\"disconnect('${row.bssid}')\">disconnect</button>`;\n"
+"            tr.appendChild(td);\n"
+"\n"
+"            tableBody.appendChild(tr);\n"
+"        });\n"
+"    }\n"
+"\n"
+"    async function disconnect(target_bssid){\n"
+"        const response = await fetch(`/attack?bssid=${target_bssid}`);\n"
+"    }\n"
+"</script>\n"
+"</html>\n";
 
 typedef struct {
     char method[8];
@@ -36,9 +104,26 @@ void handle_connection(http_request_t* req, int client_sock) {
         printf("Records:%s\n", records);
         socket_send(client_sock, records, strlen(records));
         free(records);
-    } else {
-        // send 404 response
-        
+    } else if(strcmp(req->method, "GET") == 0 && strncmp(req->url, "/attack", 7) == 0) {
+        // get bssid from url
+        char bssid[18];
+        sscanf(req->url, "/attack?bssid=%s", bssid);
+        bssid[18] = '\0';
+        // start attack
+        ESP_LOGI("WebServer", "Starting attack on BSSID: %s", bssid);
+        int ret = disconnect(bssid, &ap_records);
+        if(ret != ESP_OK) {
+            ESP_LOGE("WebServer", "BSSID not found");
+            char* not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
+            socket_send(client_sock, not_found, strlen(not_found));
+            return;
+        }
+        char* found = "HTTP/1.1 200 Ok\r\nContent-Length: 0\r\n\r\n";
+        socket_send(client_sock, found, strlen(found));
+    }
+    else {
+        char* not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
+        socket_send(client_sock, not_found, strlen(not_found));
     }
 }
 
