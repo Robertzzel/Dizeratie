@@ -2,128 +2,72 @@
 #define WEBSERVER_H
 
 #include "socket.h"
+#include "http_response.h"
+#include "http_request.h"
 
 static wifictl_ap_records_t ap_records = {0};
 
-char* html = 
-"<!DOCTYPE html>\n"
-"<html lang=\"en\">\n"
-"<head>\n"
-"    <meta charset=\"UTF-8\">\n"
-"    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-"    <title>Document</title>\n"
-"</head>\n"
-"<body>\n"
-"    <table id=\"data-table\" border=\"1\">\n"
-"        <thead>\n"
-"            <tr>\n"
-"                <th>SSID</th>\n"
-"                <th>BSSID</th>\n"
-"                <th>DISCONNECT</th>\n"
-"            </tr>\n"
-"        </thead>\n"
-"        <tbody id=\"table-body\">\n"
-"            <!-- Rows will be dynamically added here -->\n"
-"        </tbody>\n"
-"    </table>\n"
-"    <button id=\"fetch-data\">Fetch Data</button>\n"
-"</body>\n"
-"<script>\n"
-"    document.getElementById('fetch-data').addEventListener('click', async () => {\n"
-"        try {\n"
-"            console.log(\"fetching data...\");\n"
-"            const response = await fetch('/scan');\n"
-"            if (!response.ok) {\n"
-"                throw new Error('Network response was not ok');\n"
-"            }\n"
-"            console.log(\"parsing response to json...\");\n"
-"            const data = await response.json();\n"
-"            console.log(\"data: \", data)\n"
-"            console.log(\"populating table...\");\n"
-"            populate_table(data);\n"
-"        } catch (error) {\n"
-"            console.error('Error fetching data:', error);\n"
-"        }\n"
-"    });\n"
-"\n"
-"    function populate_table(json_data){\n"
-"        const tableBody = document.getElementById('table-body');\n"
-"        tableBody.innerHTML = ''; // Clear existing rows\n"
-"\n"
-"        json_data.forEach(row => {\n"
-"            const tr = document.createElement('tr');\n"
-"\n"
-"            let td = document.createElement('td');\n"
-"            td.textContent = row.ssid;\n"
-"            tr.appendChild(td);\n"
-"\n"
-"            td = document.createElement('td');\n"
-"            td.textContent = row.bssid;\n"
-"            tr.appendChild(td);\n"
-"\n"
-"            td = document.createElement('td');\n"
-"            td.innerHTML = `<button onclick=\"disconnect('${row.bssid}')\">disconnect</button>`;\n"
-"            tr.appendChild(td);\n"
-"\n"
-"            tableBody.appendChild(tr);\n"
-"        });\n"
-"    }\n"
-"\n"
-"    async function disconnect(target_bssid){\n"
-"        const response = await fetch(`/attack?bssid=${target_bssid}`);\n"
-"    }\n"
-"</script>\n"
-"</html>\n";
+void handle_root(int client_sock) {
+    http_send_root_page(client_sock);
+}
 
-typedef struct {
-    char method[8];
-    char url[256];
-} http_request_t;
+void handle_scan(int client_sock) {
+    int err = scan_networks(&ap_records);
+    if (err != 0) {
+        ESP_LOGE("WebServer", "Failed to scan networks");
+        http_send_not_found_response(client_sock);
+        return;
+    }
+    char* records = records_to_json(&ap_records);
+    err = http_send_json_response(client_sock, records);
+    free(records);
+}
 
-http_request_t parse_http_request(const char* request) {
-    http_request_t req;
-    sscanf(request, "%s %s", req.method, req.url);
-    return req;
+void handle_attack(http_request_t* req, int client_sock) {
+    char bssid[18];
+    int ret = http_request_get_url_param(req->url, "bssid", sizeof(bssid), bssid);
+    if (ret != 0) {
+        ESP_LOGE("WebServer", "Failed to get BSSID from URL");
+        http_send_not_found_response(client_sock);
+        return;
+    }
+    uint8_t bytes_bssid[6];
+    ret = bssid_string_to_bytes(bssid, bytes_bssid);
+    if(ret != 0)
+    {
+        ESP_LOGE("WebServer", "Failed to convert BSSID string to bytes");
+        http_send_not_found_response(client_sock);
+        return;
+    }
+    wifi_ap_record_t* record = get_ap_record_by_bssid(&ap_records, bytes_bssid);
+    if(record == NULL)
+    {
+        ESP_LOGE("WebServer", "BSSID not found");
+        http_send_not_found_response(client_sock);
+        return;
+    }
+    ret = disconnect(record, 10);
+    if (ret != ESP_OK) {
+        ESP_LOGE("WebServer", "BSSID not found");
+        http_send_not_found_response(client_sock);
+        return;
+    }
+    http_send_ok_response(client_sock);
 }
 
 void handle_connection(http_request_t* req, int client_sock) {
     if (strcmp(req->method, "GET") == 0 && strcmp(req->url, "/") == 0) {
-        // send index.html file
-        socket_send(client_sock, html, strlen(html));
+        ESP_LOGI("WebServer", "Handling root request");
+        handle_root(client_sock);
     } else if (strcmp(req->method, "GET") == 0 && strcmp(req->url, "/scan") == 0) {
-        // handle scan request
-        ESP_LOGE("WebServer", "Handling scan request");
-        
-        int err = scan_networks(&ap_records);
-        if (err != 0) {
-            ESP_LOGE("WebServer", "Failed to scan networks");
-            return;
-        }
-        ESP_LOGE("WebServer", "Scan completed");
-        char* records = records_to_json(&ap_records);
-        printf("Records:%s\n", records);
-        socket_send(client_sock, records, strlen(records));
-        free(records);
+        ESP_LOGI("WebServer", "Handling scan request");
+        handle_scan(client_sock);
     } else if(strcmp(req->method, "GET") == 0 && strncmp(req->url, "/attack", 7) == 0) {
-        // get bssid from url
-        char bssid[18];
-        sscanf(req->url, "/attack?bssid=%s", bssid);
-        bssid[18] = '\0';
-        // start attack
-        ESP_LOGI("WebServer", "Starting attack on BSSID: %s", bssid);
-        int ret = disconnect(bssid, &ap_records);
-        if(ret != ESP_OK) {
-            ESP_LOGE("WebServer", "BSSID not found");
-            char* not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-            socket_send(client_sock, not_found, strlen(not_found));
-            return;
-        }
-        char* found = "HTTP/1.1 200 Ok\r\nContent-Length: 0\r\n\r\n";
-        socket_send(client_sock, found, strlen(found));
-    }
-    else {
-        char* not_found = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n";
-        socket_send(client_sock, not_found, strlen(not_found));
+        ESP_LOGI("WebServer", "Handling attack request");
+        handle_attack(req, client_sock);
+    } else {
+        ESP_LOGI("WebServer", "Handling not found request");
+        http_send_not_found_response(client_sock);
     }
 }
 
@@ -144,14 +88,13 @@ void start_webserver(){
         return;
     }
 
-    ESP_LOGI("WebServer", "Listening...");
     if (socket_listen(sock, 5) < 0) {
         ESP_LOGE("WebServer", "Failed to listen on socket");
         close(sock);
         return;
     }
-
     ESP_LOGI("WebServer", "Web server started on port 80");
+
     while (1) {
         int client_sock = socket_accept(sock);
         if (client_sock < 0) {
@@ -167,9 +110,9 @@ void start_webserver(){
             close(client_sock);
             continue;
         }
-        buffer[len] = '\0';
+        buffer[len] = 0;
         
-        http_request_t req = parse_http_request(buffer);
+        http_request_t req = http_request_parse(buffer);
         printf("Request Method: %s\n", req.method);
         printf("Request URL: %s\n", req.url);
 

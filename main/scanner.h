@@ -13,29 +13,15 @@
 #include "esp_event.h"
 #include <nvs_flash.h>
 
-#define CONFIG_SCAN_MAX_AP 10
+#define MAX_APS 30
 typedef struct {
     uint16_t count;
-    wifi_ap_record_t records[CONFIG_SCAN_MAX_AP];
+    wifi_ap_record_t records[MAX_APS];
 } wifictl_ap_records_t;
 
-void print_ap_info(wifi_ap_record_t* ap) {
-    printf("SSID: %s\n", ap->ssid);
-    printf("Primary Channel: %u\n", ap->primary);
-    printf("BSSID (MAC Address): %02X:%02X:%02X:%02X:%02X:%02X\n",
-           ap->bssid[0], ap->bssid[1], ap->bssid[2],
-           ap->bssid[3], ap->bssid[4], ap->bssid[5]);
-}
-void print_ap_records(wifictl_ap_records_t* ap_records){
-    unsigned i;
-    for(i = 0; i < ap_records->count; ++i){
-        wifi_ap_record_t record = ap_records->records[i];
-        print_ap_info(&record);
-    }
-}
 int scan_networks(wifictl_ap_records_t* ap_records)
 {
-    ap_records->count = CONFIG_SCAN_MAX_AP;
+    ap_records->count = MAX_APS;
     wifi_scan_config_t scan_config = {
         .ssid = NULL,
         .bssid = NULL,
@@ -126,17 +112,4 @@ char* records_to_json(wifictl_ap_records_t* ap){
     json[offset] = '\0';
     return json;
 }
-/*
-ex scan:
-
-wifictl_ap_records_t ap_records = {0};
-int err = scan_networks(&state, &ap_records);
-if (err != 0) {
-    ESP_LOGE("app_main", "Failed to scan networks");
-    return;
-}
-
-print_ap_records(&ap_records);
-ESP_ERROR_CHECK(wifi_stop(&state));
-*/
 #endif // SCANNER_H

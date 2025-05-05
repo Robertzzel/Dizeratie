@@ -21,19 +21,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(wifi_start());
-
-    wifi_config_t config = 
-    {
-        .ap = 
-        {
-            .ssid = "ESP32",
-            .ssid_len = strlen("ESP32"),
-            .password = "ESP32ESP32",
-            .max_connection = 2,
-            .authmode = WIFI_AUTH_WPA2_PSK
-        },
-    };
-    ESP_ERROR_CHECK(wifi_config(&config));
+    ESP_ERROR_CHECK(set_default_config());
 
     start_webserver();
 }
