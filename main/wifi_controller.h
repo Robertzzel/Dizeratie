@@ -16,8 +16,11 @@
 #include "esp_event.h"
 #include "esp_timer.h"
 #include <nvs_flash.h>
+#include "lwip/inet.h"
 #include "scanner.h"
 #include "os_functions.h"
+#include "lwip/ip4_addr.h"
+#include <arpa/inet.h>
 
 static uint8_t original_mac_ap[6];
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data){}
@@ -25,6 +28,63 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
 int wifi_config(wifi_config_t* config)
 {
     return esp_wifi_set_config(ESP_IF_WIFI_AP, config);
+}
+
+int wifi_set_dns_server(esp_netif_t *netif)
+{
+    // stop dhcp client
+    int ret = esp_netif_dhcps_stop(netif);
+    if (ret != ESP_OK) {
+        ESP_LOGE("WIFICONTROLLER", "Failed to stop DHCP client");
+        return -1;
+    }
+
+    // check dhcp client status
+    esp_netif_dhcp_status_t dhcpc_status;
+    ret = esp_netif_dhcps_get_status(netif, &dhcpc_status);
+    if (ret != ESP_OK) {
+        ESP_LOGE("WIFICONTROLLER", "Failed to get DHCP client status");
+        return -1;
+    }
+    if (dhcpc_status != ESP_NETIF_DHCP_STOPPED) {
+        ESP_LOGE("WIFICONTROLLER", "DHCP client is not stopped");
+        return -1;
+    }
+
+    ESP_LOGI("WIFICONTROLLER", "DHCP client stopped : %s", esp_err_to_name(ret));
+    esp_netif_ip_info_t ip;
+    memset(&ip, 0 , sizeof(esp_netif_ip_info_t));
+    ip.ip.addr = ipaddr_addr("192.168.10.1");
+    ip.netmask.addr = ipaddr_addr("255.255.255.0");
+    ip.gw.addr = ipaddr_addr("192.168.10.1");
+
+    ret = esp_netif_set_ip_info(netif, &ip);
+    if (ret != ESP_OK) {
+        ESP_LOGE("WIFICONTROLLER", "Failed to set IP info: %s", esp_err_to_name(ret));
+        return -1;
+    }
+
+    uint32_t addr = ipaddr_addr("192.168.10.1");
+    if (!addr || (addr == IPADDR_NONE)) {
+        ESP_LOGE("WIFICONTROLLER", "Invalid DNS server address");
+        return -1;
+    }
+    
+    esp_netif_dns_info_t dns;
+    dns.ip.u_addr.ip4.addr = addr;
+    dns.ip.type = IPADDR_TYPE_V4;
+
+    ret = esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
+    if (ret != ESP_OK) {
+        ESP_LOGE("WIFICONTROLLER", "Failed to set DNS server");
+        return ret;
+    }
+    ret = esp_netif_set_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
+    if (ret != ESP_OK) {
+        ESP_LOGE("WIFICONTROLLER", "Failed to set backup DNS server");
+        return ret;
+    }
+    return esp_netif_dhcps_start(netif);
 }
 
 int wifi_start() 
@@ -35,7 +95,7 @@ int wifi_start()
         return ret;
     }
 
-    esp_netif_create_default_wifi_ap();
+    esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t wifi_init_config = WIFI_INIT_CONFIG_DEFAULT();
@@ -66,6 +126,11 @@ int wifi_start()
         return ret;
     }
     ret = esp_wifi_start();
+    if(ret != ESP_OK)
+    {
+        return ret;
+    }
+    ret = wifi_set_dns_server(ap_netif);
     if(ret != ESP_OK)
     {
         return ret;
@@ -132,5 +197,6 @@ int disconnect(wifi_ap_record_t* record, unsigned int seconds)
     memcpy(config.ap.ssid, record->ssid, strlen((char*)record->ssid));
     return wifi_config(&config);
 }
+
 
 #endif // WIFI_CONTROLLER_H
