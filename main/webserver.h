@@ -55,16 +55,52 @@ void handle_attack(http_request_t* req, int client_sock) {
     http_send_ok_response(client_sock);
 }
 
+void handle_flood(http_request_t* req, int client_sock){
+    uint8_t line = 0;
+    uint8_t beacon_rick[200];
+    uint16_t seq[TOTAL_LINES] = { 0 };
+    while(1){
+        vTaskDelay(100 / TOTAL_LINES / portTICK_PERIOD_MS);
+        memcpy(beacon_rick, beacon_frame, BEACON_SSID_OFFSET - 1);
+        beacon_rick[BEACON_SSID_OFFSET - 1] = strlen(rick_ssids[line]);
+        memcpy(&beacon_rick[BEACON_SSID_OFFSET], rick_ssids[line], strlen(rick_ssids[0]));
+        memcpy(&beacon_rick[BEACON_SSID_OFFSET + strlen(rick_ssids[line])], &beacon_frame[BEACON_SSID_OFFSET], sizeof(beacon_frame) - BEACON_SSID_OFFSET);
+        beacon_rick[SRCADDR_OFFSET + 5] = line;
+        beacon_rick[BSSID_OFFSET + 5] = line;
+
+        beacon_rick[SEQNUM_OFFSET] = (seq[line] & 0x0f) << 4;
+		beacon_rick[SEQNUM_OFFSET + 1] = (seq[line] & 0xff0) >> 4;
+        seq[line]++;
+
+        if (seq[line] > 0xfff)
+        seq[line] = 0;
+
+        esp_wifi_80211_tx(WIFI_IF_AP, beacon_rick, sizeof(beacon_frame) + strlen(rick_ssids[0]), false);
+        
+        if (++line >= TOTAL_LINES)
+			line = 0;
+    }
+}
+
 void handle_connection(http_request_t* req, int client_sock) {
-    if (strcmp(req->method, "GET") == 0 && strcmp(req->url, "/") == 0) {
+    if(strcmp(req->method, "POST") == 0) {
+        ESP_LOGI("WebServer", "Handling POST request");
+        http_send_not_found_response(client_sock);
+        return;
+    }
+
+    if (strcmp(req->url, "/") == 0) {
         ESP_LOGI("WebServer", "Handling root request");
         handle_root(client_sock);
-    } else if (strcmp(req->method, "GET") == 0 && strcmp(req->url, "/scan") == 0) {
+    } else if (strcmp(req->url, "/scan") == 0) {
         ESP_LOGI("WebServer", "Handling scan request");
         handle_scan(client_sock);
-    } else if(strcmp(req->method, "GET") == 0 && strncmp(req->url, "/attack", 7) == 0) {
+    } else if(strncmp(req->url, "/attack", 7) == 0) {
         ESP_LOGI("WebServer", "Handling attack request");
         handle_attack(req, client_sock);
+    } else if (strcmp(req->url, "/flood") == 0) {
+        ESP_LOGI("WebServer", "Handling flood request");
+        handle_flood(req, client_sock);
     } else {
         ESP_LOGI("WebServer", "Handling not found request");
         http_send_not_found_response(client_sock);

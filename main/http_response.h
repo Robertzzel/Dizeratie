@@ -10,6 +10,7 @@ char* html =
 "    <title>Document</title>\n"
 "</head>\n"
 "<body>\n"
+"<button id=\"flood-button\">Flood</button>\n"
 "    <table id=\"data-table\" border=\"1\">\n"
 "        <thead>\n"
 "            <tr>\n"
@@ -68,6 +69,9 @@ char* html =
 "    async function disconnect(target_bssid){\n"
 "        const response = await fetch(`/attack?bssid=${target_bssid}`);\n"
 "    }\n"
+"document.getElementById('flood-button').addEventListener('click', async () => {\n"
+"    const response = await fetch(`/flood`);\n"
+"});\n"
 "</script>\n"
 "</html>\n";
 
