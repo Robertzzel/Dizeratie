@@ -70,21 +70,18 @@ int hex_char_to_int(char c) {
 }
 
 int bssid_string_to_bytes(const char *bssid, unsigned char *bytes) {
-    // BSSID must be 17 characters long: 6 pairs of hex digits, and 5 colons
     if (strlen(bssid) != 17) {
-        return -1;  // Invalid BSSID length
+        return -1;
     }
 
     for (int i = 0; i < 6; i++) {
-        // Convert each pair of hex characters to a byte
-        int high = hex_char_to_int(bssid[3*i]);         // First hex character of the pair
-        int low = hex_char_to_int(bssid[3*i + 1]);      // Second hex character of the pair
+        int high = hex_char_to_int(bssid[3*i]);
+        int low = hex_char_to_int(bssid[3*i + 1]);
 
         if (high == -1 || low == -1) {
-            return -1;  // Invalid hex character in BSSID
+            return -1;
         }
 
-        // Combine the two nibbles into a byte and store it in the array
         bytes[i] = (high << 4) | low;
     }
 
