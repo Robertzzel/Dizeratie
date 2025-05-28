@@ -35,7 +35,7 @@ uint8_t beacon_frame[] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,	            // 24-31: Timestamp (GETS OVERWRITTEN TO 0 BY HARDWARE)
 	0x64, 0x00,							                        // 32-33: Beacon interval
 	0x31, 0x04,							                        // 34-35: Capability info
-	0x00, 0x00, /* FILL CONTENT HERE */				            // 36-38: SSID parameter set, 0x00:length:content
+	0x00, 0x00, /* FILL CONTENT HERE <BEACON_SSID_OFFSET> */    // 36-38: SSID parameter set, 0x00:length:content
 	0x01, 0x08, 0x82, 0x84,	0x8b, 0x96, 0x0c, 0x12, 0x18, 0x24,	// 39-48: Supported rates
 	0x03, 0x01, 0x01,						                    // 49-51: DS Parameter set, current channel 1 (= 0x01),
 	0x05, 0x04, 0x01, 0x02, 0x00, 0x00,				            // 52-57: Traffic Indication Map
@@ -61,37 +61,32 @@ int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3){
     return 0;
 }
 
-int wsl_bypasser_send_raw_frame(const uint8_t *frame_buffer, int size){
-    return esp_wifi_80211_tx(WIFI_IF_AP, frame_buffer, size, false);
-}
+int wifi_stop_dhcp_server(esp_netif_t *netif){
+    int ret = esp_netif_dhcps_stop(netif);
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
-int wifi_config(wifi_config_t* config)
-{
-    return esp_wifi_set_config(ESP_IF_WIFI_AP, config);
+    esp_netif_dhcp_status_t dhcpc_status;
+    ret = esp_netif_dhcps_get_status(netif, &dhcpc_status);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    if (dhcpc_status != ESP_NETIF_DHCP_STOPPED) {
+        return -1;
+    }
+    return ESP_OK;
 }
 
 int wifi_set_dns_server(esp_netif_t *netif)
 {
     // stop dhcp client
-    int ret = esp_netif_dhcps_stop(netif);
+    int ret = wifi_stop_dhcp_server(netif);
     if (ret != ESP_OK) {
-        ESP_LOGE("WIFICONTROLLER", "Failed to stop DHCP client");
-        return -1;
+        ESP_LOGE("WIFICONTROLLER", "Failed to stop DHCP client: %s", esp_err_to_name(ret));
+        return ret;
     }
 
-    // check dhcp client status
-    esp_netif_dhcp_status_t dhcpc_status;
-    ret = esp_netif_dhcps_get_status(netif, &dhcpc_status);
-    if (ret != ESP_OK) {
-        ESP_LOGE("WIFICONTROLLER", "Failed to get DHCP client status");
-        return -1;
-    }
-    if (dhcpc_status != ESP_NETIF_DHCP_STOPPED) {
-        ESP_LOGE("WIFICONTROLLER", "DHCP client is not stopped");
-        return -1;
-    }
-
-    ESP_LOGI("WIFICONTROLLER", "DHCP client stopped : %s", esp_err_to_name(ret));
     esp_netif_ip_info_t ip;
     memset(&ip, 0 , sizeof(esp_netif_ip_info_t));
     ip.ip.addr = ipaddr_addr("192.168.10.1");
@@ -190,7 +185,7 @@ int wifi_stop()
     return esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config);
 }
 
-int set_default_config()
+int wifi_set_default_config()
 {
     wifi_config_t config = 
     {
@@ -204,18 +199,19 @@ int set_default_config()
             .max_connection = 2
         },
     };
-    return wifi_config(&config);
+    esp_wifi_set_mac(WIFI_IF_AP, original_mac_ap);
+    return esp_wifi_set_config(ESP_IF_WIFI_AP, &config);
 }
 
-void void_set_default_config()
+void wifi_void_set_default_config()
 {
     ESP_LOGE("WIFICONTROLLER", "Setting default config");
-    set_default_config();
+    wifi_set_default_config();
 }
 
-int disconnect(wifi_ap_record_t* record, unsigned int seconds)
+int wifi_disconnect(wifi_ap_record_t* record, unsigned int seconds)
 {
-    delay_function(&void_set_default_config, seconds);
+    delay_function(&wifi_void_set_default_config, seconds);
 
     int ret = esp_wifi_set_mac(WIFI_IF_AP, record->bssid);
     if(ret != ESP_OK) 
@@ -235,7 +231,7 @@ int disconnect(wifi_ap_record_t* record, unsigned int seconds)
         },
     };
     memcpy(config.ap.ssid, record->ssid, strlen((char*)record->ssid));
-    return wifi_config(&config);
+    return esp_wifi_set_config(ESP_IF_WIFI_AP, &config);
 }
 
 

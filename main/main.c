@@ -16,12 +16,13 @@
 #include "scanner.h"
 #include "webserver.h"
 #include "dns.h"
+#include "facebook_web_server.h"
 void app_main(void)
 {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(wifi_start());
-    ESP_ERROR_CHECK(set_default_config());
+    ESP_ERROR_CHECK(wifi_set_default_config());
 
     xTaskCreate(dns_server_task, "dns_server_task", 4096, NULL, 5, NULL);
     xTaskCreate(serve_facebook_page, "serve_facebook_page", 4096, NULL, 5, NULL);

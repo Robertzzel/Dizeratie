@@ -3,6 +3,24 @@
 
 #define DNS_PORT 53
 #define ESP32_IP "192.168.10.1"
+#include <string.h>
+int get_query_name(const uint8_t *buffer, int len, char *domain, int max_len_domain) {
+    int pos = 12;  // Start of question section
+    int i = 0;
+    while (pos < len && buffer[pos] != 0) {
+        uint8_t label_len = buffer[pos];
+        pos++;
+        for (int j = 0; j < label_len && pos < len; j++) {
+            domain[i] = buffer[pos];
+            pos++;
+            i++;
+        }
+        domain[i] = '.';
+        i++;
+    }
+    domain[i - 1] = '\0';  // Null-terminate
+    return pos;
+}
 
 void dns_server_task(void *pvParameters) {
     int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
@@ -31,24 +49,15 @@ void dns_server_task(void *pvParameters) {
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t addr_len = sizeof(client_addr);
-        int len = recvfrom(sock, buffer, sizeof(buffer), 0,
-                           (struct sockaddr *)&client_addr, &addr_len);
-        if (len <= 0) continue;
-
+        int len = recvfrom(sock, buffer, sizeof(buffer), 0, (struct sockaddr *)&client_addr, &addr_len);
+        if (len <= 0) {
+            continue;
+        }
         // Parse question domain
         char domain[256] = {0};
-        int pos = 12;  // Start of question section
-        int i = 0;
-        while (pos < len && buffer[pos] != 0) {
-            uint8_t label_len = buffer[pos++];
-            for (int j = 0; j < label_len && pos < len; j++) {
-                domain[i++] = buffer[pos++];
-            }
-            domain[i++] = '.';
-        }
-        domain[i - 1] = '\0';  // Null-terminate
+        int pos = get_query_name(buffer, len, domain, 256);
 
-        //ESP_LOGI("DNSServer", "Received DNS query for: %s", domain);
+        ESP_LOGI("DNSServer", "Received DNS query for: %s", domain);
 
         bool is_target = (
             strcmp(domain, "facebook.com") == 0 ||
@@ -65,13 +74,12 @@ void dns_server_task(void *pvParameters) {
             int rpos = qlen;
 
             // Copy name as pointer to offset 0xC
-            buffer[rpos++] = 0xC0;
-            buffer[rpos++] = 0x0C;
+            buffer[rpos++] = 0xC0; buffer[rpos++] = 0x0C;
 
             buffer[rpos++] = 0x00; buffer[rpos++] = 0x01;  // TYPE A
             buffer[rpos++] = 0x00; buffer[rpos++] = 0x01;  // CLASS IN
-            buffer[rpos++] = 0x00; buffer[rpos++] = 0x00; buffer[rpos++] = 0x00; buffer[rpos++] = 0x3C; // TTL
-            buffer[rpos++] = 0x00; buffer[rpos++] = 0x04;  // RDLENGTH
+            buffer[rpos++] = 0x00; buffer[rpos++] = 0x00; buffer[rpos++] = 0x00; buffer[rpos++] = 0x78; // TTL 120 sec
+            buffer[rpos++] = 0x00; buffer[rpos++] = 0x04;  // RDLENGTH 4 bytes (an address)
 
             struct in_addr ip;
             inet_aton(ESP32_IP, &ip);

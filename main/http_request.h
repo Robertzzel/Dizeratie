@@ -49,10 +49,21 @@ http_request_t http_request_parse(const char *raw_request) {
 }
 
 void free_http_request(http_request_t *req) {
-    free(req->method);
-    free(req->url);
-    free(req->body);
-    req->method = req->url = req->body = NULL;
+    if(req == NULL) {
+        return;
+    }
+    if (req->method != NULL) {
+        free(req->method);
+        req->method = NULL;
+    }
+    if (req->url != NULL) {
+        free(req->url);
+        req->url = NULL;
+    }
+    if (req->body != NULL) {
+        free(req->body);
+        req->body = NULL;
+    }
 }
 
 int extract_form_field_to_buffer(const char *body, const char *key, char *buffer, size_t buffer_size) {
@@ -85,11 +96,14 @@ int extract_form_field_to_buffer(const char *body, const char *key, char *buffer
 }
 
 int http_request_get_url_param(const char* url, const char* param, size_t value_max_size, char* value) {
-    const char* start = strstr(url, param);
+    const char* start = strstr(url, param); // find start of the parameter
     if (!start) {
         return -1;
     }
-    start += strlen(param) + 1;
+    start += strlen(param) + 1; // move past "param="
+    if (*start == '\0') {
+        return -1; // param found but it has no value
+    }
     const char* end = strchr(start, '&');
     if (!end) {
         end = url + strlen(url);
