@@ -58,25 +58,35 @@ void handle_flood(http_request_t* req, int client_sock){
     while(1){
         vTaskDelay(100 / TOTAL_LINES / portTICK_PERIOD_MS);
 
+        // copy values until SSID offset
         memcpy(beacon_rick, beacon_frame, BEACON_SSID_OFFSET - 1);
 
-        uint8_t ssid_len = strlen(rick_ssids[line_index]);
         char* ssid = rick_ssids[line_index];
+        uint8_t ssid_len = strlen(ssid);
 
-        beacon_rick[BEACON_SSID_OFFSET - 1] = strlen(rick_ssids[line_index]);
-        memcpy(&beacon_rick[BEACON_SSID_OFFSET], rick_ssids[line_index], strlen(rick_ssids[0]));
-        memcpy(&beacon_rick[BEACON_SSID_OFFSET + strlen(rick_ssids[line_index])], &beacon_frame[BEACON_SSID_OFFSET], sizeof(beacon_frame) - BEACON_SSID_OFFSET);
+        // set SSID length and copy SSID
+        beacon_rick[BEACON_SSID_OFFSET - 1] = ssid_len;
+        memcpy(beacon_rick + BEACON_SSID_OFFSET, ssid, ssid_len);
+
+        // copy the rest of the beacon frame
+        memcpy(beacon_rick + BEACON_SSID_OFFSET + ssid_len, beacon_frame + BEACON_SSID_OFFSET, sizeof(beacon_frame) - BEACON_SSID_OFFSET);
+        
+        // set the source address and BSSID
         beacon_rick[SRCADDR_OFFSET + 5] = line_index;
         beacon_rick[BSSID_OFFSET + 5] = line_index;
 
+        // set the sequence number
+        // The sequence number is a 12-bit value, so we need to split it into two bytes
+        // The first byte contains the 4 most significant bits and the second byte contains the 8 least significant bits
         beacon_rick[SEQNUM_OFFSET] = (seq[line_index] & 0x0f) << 4;
 		beacon_rick[SEQNUM_OFFSET + 1] = (seq[line_index] & 0xff0) >> 4;
+        
         seq[line_index]++;
 
         if (seq[line_index] > 0xfff)
-        seq[line_index] = 0;
+            seq[line_index] = 0;
 
-        esp_wifi_80211_tx(WIFI_IF_AP, beacon_rick, sizeof(beacon_frame) + strlen(rick_ssids[0]), false);
+        esp_wifi_80211_tx(WIFI_IF_AP, beacon_rick, sizeof(beacon_frame) + ssid_len, false);
         
         if (++line_index >= TOTAL_LINES)
 			line_index = 0;
