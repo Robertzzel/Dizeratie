@@ -233,6 +233,4 @@ int wifi_disconnect(wifi_ap_record_t* record, unsigned int seconds)
     memcpy(config.ap.ssid, record->ssid, strlen((char*)record->ssid));
     return esp_wifi_set_config(ESP_IF_WIFI_AP, &config);
 }
-
-
 #endif // WIFI_CONTROLLER_H

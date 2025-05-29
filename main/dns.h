@@ -57,7 +57,7 @@ void dns_server_task(void *pvParameters) {
         char domain[256] = {0};
         int pos = get_query_name(buffer, len, domain, 256);
 
-        ESP_LOGI("DNSServer", "Received DNS query for: %s", domain);
+        //ESP_LOGI("DNSServer", "Received DNS query for: %s", domain);
 
         bool is_target = (
             strcmp(domain, "facebook.com") == 0 ||
