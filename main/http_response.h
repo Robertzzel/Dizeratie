@@ -40,6 +40,11 @@ int http_send_bad_request_response(int client_sock) {
     socket_send(client_sock, bad_request, strlen(bad_request));
     return 0;
 }
+int http_send_conflict_response(int client_sock) {
+    char* conflict = "HTTP/1.1 409 Conflict\r\nContent-Length: 0\r\n\r\n";
+    socket_send(client_sock, conflict, strlen(conflict));
+    return 0;
+}
 
 
 #endif // HTTP_RESPONSE_H

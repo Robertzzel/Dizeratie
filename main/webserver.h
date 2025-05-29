@@ -5,6 +5,7 @@
 #include "http_response.h"
 #include "http_request.h"
 #include "html_pages.h"
+#include "tasks.h"
 
 static wifictl_ap_records_t ap_records = {0};
 
@@ -51,49 +52,28 @@ void handle_attack(http_request_t* req, int client_sock) {
     }
 }
 
-void handle_flood(http_request_t* req, int client_sock){
-    http_send_ok_response(client_sock);
-    uint8_t line_index = 0;
-    uint8_t beacon_rick[200];
-    uint16_t seq[TOTAL_LINES] = { 0 };
-
-    int duration_seconds = 30; // modifică această valoare după nevoie
-    TickType_t start_tick = xTaskGetTickCount();
-    TickType_t end_tick = start_tick + (duration_seconds * 1000 / portTICK_PERIOD_MS);
-
-    while (xTaskGetTickCount() < end_tick) {
-        vTaskDelay(100 / TOTAL_LINES / portTICK_PERIOD_MS);
-        
-        // copy values until SSID offset
-        memcpy(beacon_rick, beacon_frame, BEACON_SSID_OFFSET - 1);
-
-        char* ssid = rick_ssids[line_index];
-        uint8_t ssid_len = strlen(ssid);
-        printf("Sending frame %s\n", ssid);
-        // set SSID length and copy SSID
-        beacon_rick[BEACON_SSID_OFFSET - 1] = ssid_len;
-        memcpy(beacon_rick + BEACON_SSID_OFFSET, ssid, ssid_len);
-
-        // copy the rest of the beacon frame
-        memcpy(beacon_rick + BEACON_SSID_OFFSET + ssid_len, beacon_frame + BEACON_SSID_OFFSET, sizeof(beacon_frame) - BEACON_SSID_OFFSET);
-        
-        // set the source address and BSSID
-        beacon_rick[SRCADDR_OFFSET + 5] = line_index;
-        beacon_rick[BSSID_OFFSET + 5] = line_index;
-
-        // set the sequence number
-        beacon_rick[SEQNUM_OFFSET] = (seq[line_index] & 0x0f) << 4;
-        beacon_rick[SEQNUM_OFFSET + 1] = (seq[line_index] & 0xff0) >> 4;
-        
-        seq[line_index]++;
-        if (seq[line_index] > 0xfff)
-            seq[line_index] = 0;
-
-        esp_wifi_80211_tx(WIFI_IF_AP, beacon_rick, sizeof(beacon_frame) + ssid_len, false);
-
-        if (++line_index >= TOTAL_LINES)
-            line_index = 0;
+void handle_flood(http_request_t* req, int client_sock) {
+    if (flood_running || flood_task_handle != NULL) {
+        http_send_error_response(client_sock); // Flood already running
+        return;
     }
+
+    if (xTaskCreate(flood_task, "FloodTask", 4096, NULL, 5, &flood_task_handle) != pdPASS) {
+        http_send_error_response(client_sock); // Could not create task
+        return;
+    }
+
+    http_send_ok_response(client_sock); // 200 OK
+}
+
+void handle_flood_stop(http_request_t* req, int client_sock) {
+    if (!flood_running || flood_task_handle == NULL) {
+        http_send_conflict_response(client_sock);
+        return;
+    }
+
+    flood_running = false;
+    http_send_ok_response(client_sock); // 200
 }
 
 void handle_connection(http_request_t* req, int client_sock) {
@@ -115,6 +95,9 @@ void handle_connection(http_request_t* req, int client_sock) {
     } else if (strcmp(req->url, "/flood") == 0) {
         ESP_LOGI("WebServer", "Handling flood request");
         handle_flood(req, client_sock);
+    } else if (strcmp(req->url, "/flood/stop") == 0) {
+        ESP_LOGI("WebServer", "Handling flood stop request");
+        handle_flood_stop(req, client_sock);
     } else {
         ESP_LOGI("WebServer", "Handling not found request");
         http_send_not_found_response(client_sock);
