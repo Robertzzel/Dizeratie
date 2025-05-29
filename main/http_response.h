@@ -35,6 +35,11 @@ int http_send_error_response(int client_sock) {
     socket_send(client_sock, error, strlen(error));
     return 0;
 }
+int http_send_bad_request_response(int client_sock) {
+    char* bad_request = "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n";
+    socket_send(client_sock, bad_request, strlen(bad_request));
+    return 0;
+}
 
 
 #endif // HTTP_RESPONSE_H

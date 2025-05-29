@@ -12,7 +12,7 @@ void handle_scan(int client_sock) {
     int err = scan_networks(&ap_records);
     if (err != 0) {
         ESP_LOGE("WebServer", "Failed to scan networks");
-        http_send_not_found_response(client_sock);
+        http_send_error_response(client_sock);
         return;
     }
     char* records = records_to_json(&ap_records);
@@ -25,7 +25,7 @@ void handle_attack(http_request_t* req, int client_sock) {
     int ret = http_request_get_url_param(req->url, "bssid", sizeof(bssid), bssid);
     if (ret != 0) {
         ESP_LOGE("WebServer", "Failed to get BSSID from URL");
-        http_send_not_found_response(client_sock);
+        http_send_bad_request_response(client_sock);
         return;
     }
     uint8_t bytes_bssid[6];
@@ -39,14 +39,14 @@ void handle_attack(http_request_t* req, int client_sock) {
     if(record == NULL)
     {
         ESP_LOGE("WebServer", "BSSID not found");
-        http_send_not_found_response(client_sock);
+        http_send_bad_request_response(client_sock);
         return;
     }
     http_send_ok_response(client_sock);
     ret = wifi_disconnect(record, 10);
     if (ret != ESP_OK) {
         ESP_LOGE("WebServer", "BSSID not found");
-        http_send_not_found_response(client_sock);
+        http_send_error_response(client_sock);
         return;
     }
 }
