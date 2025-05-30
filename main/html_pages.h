@@ -44,6 +44,11 @@ char* root_page_html = R"rawliteral(
       display: flex; align-items: center; justify-content: center;
       background: #343a40; color: #fff; flex-direction: column;
     }
+    .btn:disabled,
+    .btn[disabled] {
+    opacity: 0.6;           /* estompează culoarea */
+    cursor: not-allowed;    /* arată că e dezactivat */
+    }
   </style>
 </head>
 <body>
