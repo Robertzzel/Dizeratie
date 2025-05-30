@@ -19,6 +19,7 @@ void flood_task(void* pvParameters) {
         char* ssid = rick_ssids[line_index];
         uint8_t ssid_len = strlen(ssid);
 
+        printf("Sending frame %d for %s\n",line_index, ssid);
         beacon_rick[BEACON_SSID_OFFSET - 1] = ssid_len;
         memcpy(beacon_rick + BEACON_SSID_OFFSET, ssid, ssid_len);
         memcpy(beacon_rick + BEACON_SSID_OFFSET + ssid_len, beacon_frame + BEACON_SSID_OFFSET, sizeof(beacon_frame) - BEACON_SSID_OFFSET);
@@ -39,6 +40,7 @@ void flood_task(void* pvParameters) {
             line_index = 0;
     }
 
+    printf("while broke %d\n", flood_running);
     flood_task_handle = NULL;
     vTaskDelete(NULL);
 }

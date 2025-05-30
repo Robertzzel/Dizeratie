@@ -67,7 +67,7 @@ void free_http_request(http_request_t *req) {
 }
 
 int extract_form_field_to_buffer(const char *body, const char *key, char *buffer, size_t buffer_size) {
-    if (!body || !key || !buffer || buffer_size == 0) return 0;
+    if (!body || !key || !buffer || buffer_size == 0) return -1;
 
     size_t key_len = strlen(key);
     const char *pos = body;
@@ -81,18 +81,18 @@ int extract_form_field_to_buffer(const char *body, const char *key, char *buffer
 
             if (value_len >= buffer_size) {
                 // Not enough space in buffer (leave it unmodified)
-                return 0;
+                return -1;
             }
 
             memcpy(buffer, pos, value_len);
             buffer[value_len] = '\0';
-            return 1;
+            return 0;
         }
 
         pos += key_len;
     }
 
-    return 0;  // Key not found
+    return -1;  // Key not found
 }
 
 int http_request_get_url_param(const char* url, const char* param, size_t value_max_size, char* value) {
