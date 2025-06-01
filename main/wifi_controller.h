@@ -27,17 +27,17 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
 
 uint8_t beacon_frame[] = {
 	0x80, 0x00,							                        // 0-1: Frame Control
-	0x00, 0x00,							                        // 2-3: Duration
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff,				            // 4-9: Destination address (broadcast)
-	0xba, 0xde, 0xaf, 0xfe, 0x00, 0x06,				            // 10-15: Source address
+	0x00, 0x00,							                        // 2-3: Durata
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff,				            // 4-9: Destiantia (broadcast)
+	0xba, 0xde, 0xaf, 0xfe, 0x00, 0x06,				            // 10-15: Sursa
 	0xba, 0xde, 0xaf, 0xfe, 0x00, 0x06,				            // 16-21: BSSID
-    0x00, 0x00,							                        // 22-23: Sequence / fragment number
-	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,	            // 24-31: Timestamp (GETS OVERWRITTEN TO 0 BY HARDWARE)
+    0x00, 0x00,							                        // 22-23: Secventa(nr fragmentului)
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,	            // 24-31: Timestamp
 	0x64, 0x00,							                        // 32-33: Beacon interval
 	0x31, 0x04,							                        // 34-35: Capability info
-	0x00, 0x00, /* FILL CONTENT HERE <BEACON_SSID_OFFSET> */    // 36-38: SSID parameter set, 0x00:length:content
-	0x01, 0x08, 0x82, 0x84,	0x8b, 0x96, 0x0c, 0x12, 0x18, 0x24,	// 39-48: Supported rates
-	0x03, 0x01, 0x01,						                    // 49-51: DS Parameter set, current channel 1 (= 0x01),
+	0x00, 0x00, /* <BEACON_SSID_OFFSET> */                      // 36-38: SSID, 0x00-length-data
+	0x01, 0x08, 0x82, 0x84,	0x8b, 0x96, 0x0c, 0x12, 0x18, 0x24,	// 39-48: Rates
+	0x03, 0x01, 0x01,						                    // 49-51: DS Parameter set
 	0x05, 0x04, 0x01, 0x02, 0x00, 0x00,				            // 52-57: Traffic Indication Map
 };
 #define BEACON_SSID_OFFSET 38
@@ -45,14 +45,12 @@ uint8_t beacon_frame[] = {
 #define BSSID_OFFSET 16
 #define SEQNUM_OFFSET 22
 char *rick_ssids[] = {
-	"01 Never gonna give you up",
-	"02 Never gonna let you down",
-	"03 Never gonna run around",
-	"04 and desert you",
-	"05 Never gonna make you cry",
-	"06 Never gonna say goodbye",
-	"07 Never gonna tell a lie",
-	"08 and hurt you"
+	"N1",
+	"N2",
+	"N3",
+	"N4",
+	"N5",
+	"N6",
 };
 #define TOTAL_LINES (sizeof(rick_ssids) / sizeof(char *))
 
