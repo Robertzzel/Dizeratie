@@ -13,7 +13,7 @@
 #include "esp_event.h"
 #include <nvs_flash.h>
 
-#define MAX_APS 30
+#define MAX_APS 15
 typedef struct {
     uint16_t count;
     wifi_ap_record_t records[MAX_APS];
@@ -88,25 +88,41 @@ int bssid_string_to_bytes(const char *bssid, unsigned char *bytes) {
     return 0;  // Success
 }
 
-char* records_to_json(wifictl_ap_records_t* ap){
-    char* json = malloc(2048);
-    if(json == NULL){
-        return NULL;
+int records_to_json(wifictl_ap_records_t* ap, char* buf, size_t bufsize) {
+    if (buf == NULL || bufsize == 0) {
+        return 1;
     }
     int offset = 0;
-    offset += snprintf(json + offset, 2048 - offset, "[");
-    for(int i = 0; i < ap->count; i++){
+    int written = 0;
+    written = snprintf(buf + offset, bufsize - offset, "[");
+    if (written < 0 || written >= bufsize - offset)
+        return 2;
+    offset += written;
+
+    for (int i = 0; i < ap->count; i++) {
         wifi_ap_record_t record = ap->records[i];
-        offset += snprintf(json + offset, 2048 - offset, "{ \"ssid\": \"%s\", \"bssid\": \"%02X:%02X:%02X:%02X:%02X:%02X\" }",
-                           record.ssid,
-                           record.bssid[0], record.bssid[1], record.bssid[2],
-                           record.bssid[3], record.bssid[4], record.bssid[5]);
-        if(i < ap->count - 1){
-            offset += snprintf(json + offset, 2048 - offset, ",");
+        written = snprintf(buf + offset, bufsize - offset,
+            "{ \"ssid\": \"%s\", \"bssid\": \"%02X:%02X:%02X:%02X:%02X:%02X\" }",
+            record.ssid,
+            record.bssid[0], record.bssid[1], record.bssid[2],
+            record.bssid[3], record.bssid[4], record.bssid[5]);
+        if (written < 0 || written >= bufsize - offset)
+            return 2;
+        offset += written;
+
+        if (i < ap->count - 1) {
+            written = snprintf(buf + offset, bufsize - offset, ",");
+            if (written < 0 || written >= bufsize - offset)
+                return 2;
+            offset += written;
         }
     }
-    offset += snprintf(json + offset, 2048 - offset, "]");
-    json[offset] = '\0';
-    return json;
+    written = snprintf(buf + offset, bufsize - offset, "]");
+    if (written < 0 || written >= bufsize - offset)
+        return 2;
+    offset += written;
+
+    return 0;
 }
+
 #endif // SCANNER_H

