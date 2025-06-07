@@ -1,6 +1,7 @@
 #ifndef HTTP_REQUEST_H
 #define HTTP_REQUEST_H
 
+#include "allocator.h"
 
 typedef struct {
     char *method;
@@ -8,21 +9,42 @@ typedef struct {
     char *body;
 } http_request_t;
 
-http_request_t http_request_parse(const char *raw_request) {
-    http_request_t req = {0};
+http_request_t* http_request_parse(allocator_t* allocator, const char *raw_request) {
+    printf("Remaining memory on entry: %zu\n", allocator_available(allocator));
+    http_request_t* req = allocator_alloc_type(allocator, http_request_t, 1);
+    if (!req) return NULL;
 
     const char *method_end = strchr(raw_request, ' ');
-    if (!method_end) return req;
+    if (!method_end) {
+        ESP_LOGI("HTTPRequest", "Cannot find method end in request");
+        allocator_free(allocator);
+        return NULL;
+    }
 
     size_t method_len = method_end - raw_request;
-    req.method = strndup(raw_request, method_len);
+    req->method = allocator_strndup(allocator, raw_request, method_len);
+    if (!req->method){
+        ESP_LOGI("HTTPRequest", "Cannot allocate memory for method");
+        allocator_free(allocator);
+        return NULL;
+    } 
 
     const char *url_start = method_end + 1;
     const char *url_end = strchr(url_start, ' ');
-    if (!url_end) return req;
+    if (!url_end){
+        ESP_LOGI("HTTPRequest", "Cannot find URL end in request");
+        allocator_free_n(allocator, 2);
+        return NULL;
+    }
 
     size_t url_len = url_end - url_start;
-    req.url = strndup(url_start, url_len);
+    req->url = allocator_strndup(allocator, url_start, url_len);
+    if (!req->url) {
+        ESP_LOGI("HTTPRequest", "Cannot allocate memory for URL");
+        allocator_free_n(allocator, 2);
+        req->method = NULL;
+        return req;
+    }
 
     // Find start of headers
     const char *headers_start = url_end + 1;
@@ -41,7 +63,12 @@ http_request_t http_request_parse(const char *raw_request) {
         }
 
         if (content_length > 0) {
-            req.body = strndup(body_start, content_length);
+            req->body = allocator_strndup(allocator, body_start, content_length);
+            if (!req->body) {
+                ESP_LOGI("HTTPRequest", "Cannot allocate memory for body");
+                allocator_free_n(allocator, 3);
+                return NULL;
+            }
         }
     }
 
@@ -66,8 +93,8 @@ void free_http_request(http_request_t *req) {
     }
 }
 
-int extract_form_field_to_buffer(const char *body, const char *key, char *buffer, size_t buffer_size) {
-    if (!body || !key || !buffer || buffer_size == 0) return -1;
+char* extract_form_field_to_buffer(allocator_t* allocator, const char *body, const char *key) {
+    if (!body || !key || !allocator) return NULL;
 
     size_t key_len = strlen(key);
     const char *pos = body;
@@ -79,42 +106,30 @@ int extract_form_field_to_buffer(const char *body, const char *key, char *buffer
             const char *end = strchr(pos, '&');
             size_t value_len = end ? (size_t)(end - pos) : strlen(pos);
 
-            if (value_len >= buffer_size) {
-                // Not enough space in buffer (leave it unmodified)
-                return -1;
-            }
-
-            memcpy(buffer, pos, value_len);
-            buffer[value_len] = '\0';
-            return 0;
+            return allocator_strndup(allocator, pos, value_len);
         }
 
         pos += key_len;
     }
 
-    return -1;  // Key not found
+    return NULL;  // Key not found
 }
 
-int http_request_get_url_param(const char* url, const char* param, size_t value_max_size, char* value) {
+char* http_request_get_url_param(allocator_t* allocator, const char* url, const char* param) {
     const char* start = strstr(url, param); // find start of the parameter
     if (!start) {
-        return -1;
+        return NULL;
     }
     start += strlen(param) + 1; // move past "param="
     if (*start == '\0') {
-        return -1; // param found but it has no value
+        return NULL; // param found but it has no value
     }
     const char* end = strchr(start, '&');
     if (!end) {
         end = url + strlen(url);
     }
     size_t len = end - start;
-    if (len >= value_max_size) {
-        return -1;
-    }
-    strncpy(value, start, len);
-    value[len] = '\0';
-    return 0;
+    return allocator_strndup(allocator, start, len);
 }
 
 #endif // HTTP_REQUEST_H

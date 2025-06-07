@@ -61,8 +61,8 @@ int socket_accept(int sock) {
 int socket_send(int sock, char* buffer, int bytesToWrite) {
     return send(sock, buffer, bytesToWrite, 0);
 }
-int socket_receive(int sock, unsigned char* buffer, int bytesToReceive) {
-    return recv(sock, buffer, bytesToReceive, 0);
+size_t socket_receive(int sock, void* buffer, size_t bytes_to_receive) {
+    return recv(sock, buffer, bytes_to_receive, 0);
 }
 int socket_close(int sock) {
     return close(sock);

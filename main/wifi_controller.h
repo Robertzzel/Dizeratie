@@ -206,11 +206,11 @@ void wifi_void_set_default_config()
     wifi_set_default_config();
 }
 
-int wifi_disconnect(wifi_ap_record_t* record, unsigned int seconds)
+int wifi_disconnect(uint8_t* bssid, char* ssid, uint8_t channel, wifi_auth_mode_t auth_mode,  unsigned int seconds)
 {
     delay_function(&wifi_void_set_default_config, seconds);
 
-    int ret = esp_wifi_set_mac(WIFI_IF_AP, record->bssid);
+    int ret = esp_wifi_set_mac(WIFI_IF_AP, bssid);
     if(ret != ESP_OK) 
     {
         ESP_LOGE("WIFICONTROLLER", "Failed to set MAC address");
@@ -220,14 +220,14 @@ int wifi_disconnect(wifi_ap_record_t* record, unsigned int seconds)
     {
         .ap = 
         {
-            .ssid_len = strlen((char*)record->ssid),
-            .channel = record->primary,
-            .authmode = record->authmode,
+            .ssid_len = strlen(ssid),
+            .channel = channel,
+            .authmode = auth_mode,
             .password = "ESP32ESP32",
             .max_connection = 1
         },
     };
-    memcpy(config.ap.ssid, record->ssid, strlen((char*)record->ssid));
+    memcpy(config.ap.ssid, ssid, strlen(ssid));
     return esp_wifi_set_config(ESP_IF_WIFI_AP, &config);
 }
 #endif // WIFI_CONTROLLER_H

@@ -3,8 +3,8 @@
 
 
 int http_send_json_response(int client_sock, const char* json) {
-    size_t response_size = 128;
-    char response[128];
+    size_t response_size = 256;
+    char response[256];
     snprintf(response, response_size, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %zu\r\n\r\n", strlen(json));
     socket_send(client_sock, response, strlen(response));
     socket_send(client_sock, json, strlen(json));

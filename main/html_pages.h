@@ -116,7 +116,7 @@ char* root_page_html = R"rawliteral(
             <td>${ap.ssid}</td>
             <td>${ap.bssid}</td>
             <td>
-              <button class="btn btn-sm btn-danger" onclick="deauth('${ap.bssid}')">Deauth</button>
+              <button class="btn btn-sm btn-danger" onclick="deauth('${ap.bssid}', ${ap.channel}, ${ap.authmode}, '${encodeURIComponent(ap.ssid)}')">Deauth</button>
             </td>`;
           tbody.appendChild(tr);
         });
@@ -126,10 +126,10 @@ char* root_page_html = R"rawliteral(
       }
     };
 
-    async function deauth(bssid) {
+    async function deauth(bssid, channel, authmode, ssid) {
       const timeout = parseInt(prompt('Duration (seconds)?', '30'), 10);
       if (!timeout || timeout <= 0) return;
-      const res = await fetch(`/attack?bssid=${bssid}&timeout=${encodeURIComponent(timeout)}`);
+      const res = await fetch(`/attack?bssid=${bssid}&timeout=${encodeURIComponent(timeout)}&channel=${channel}&authmode=${authmode}&ssid=${ssid}`);
       if (res.status === 200) {
         showCountdown(timeout);
       } else if (res.status === 400) {
