@@ -51,7 +51,7 @@ AP_records_t* scan_networks(allocator_t* allocator, uint16_t APs)
         ESP_LOGE("Scanner", "Failed to get AP records: %s", esp_err_to_name(ret));
         return NULL;
     }
-    allocator_realloc_type(allocator, wifi_ap_record_t, APs);
+    allocator_realloc_type(allocator, ap_records->records, wifi_ap_record_t, APs);
     return ap_records;
 }
 

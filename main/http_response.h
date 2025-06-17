@@ -2,7 +2,7 @@
 #define HTTP_RESPONSE_H
 
 
-int http_send_json_response(int client_sock, const char* json) {
+int http_send_json_response(int client_sock, char* json) {
     size_t response_size = 256;
     char response[256];
     snprintf(response, response_size, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %zu\r\n\r\n", strlen(json));
@@ -11,7 +11,7 @@ int http_send_json_response(int client_sock, const char* json) {
     return 0;
 }
 
-int http_send_html_response(int client_sock, const char* html) {
+int http_send_html_response(int client_sock, char* html) {
     size_t header_size = 128;
     char response[128];
     snprintf(response, header_size, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %zu\r\n\r\n", strlen(html));

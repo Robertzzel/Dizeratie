@@ -17,7 +17,7 @@ http_request_t* http_request_parse(allocator_t* allocator, const char *raw_reque
     const char *method_end = strchr(raw_request, ' ');
     if (!method_end) {
         ESP_LOGI("HTTPRequest", "Cannot find method end in request");
-        allocator_free(allocator);
+        allocator_free(allocator, req);
         return NULL;
     }
 
@@ -25,7 +25,7 @@ http_request_t* http_request_parse(allocator_t* allocator, const char *raw_reque
     req->method = allocator_strndup(allocator, raw_request, method_len);
     if (!req->method){
         ESP_LOGI("HTTPRequest", "Cannot allocate memory for method");
-        allocator_free(allocator);
+        allocator_free(allocator, req);
         return NULL;
     } 
 
@@ -33,7 +33,7 @@ http_request_t* http_request_parse(allocator_t* allocator, const char *raw_reque
     const char *url_end = strchr(url_start, ' ');
     if (!url_end){
         ESP_LOGI("HTTPRequest", "Cannot find URL end in request");
-        allocator_free_n(allocator, 2);
+        allocator_free(allocator, req);
         return NULL;
     }
 
@@ -41,7 +41,7 @@ http_request_t* http_request_parse(allocator_t* allocator, const char *raw_reque
     req->url = allocator_strndup(allocator, url_start, url_len);
     if (!req->url) {
         ESP_LOGI("HTTPRequest", "Cannot allocate memory for URL");
-        allocator_free_n(allocator, 2);
+        allocator_free(allocator, req);
         req->method = NULL;
         return req;
     }
@@ -66,7 +66,7 @@ http_request_t* http_request_parse(allocator_t* allocator, const char *raw_reque
             req->body = allocator_strndup(allocator, body_start, content_length);
             if (!req->body) {
                 ESP_LOGI("HTTPRequest", "Cannot allocate memory for body");
-                allocator_free_n(allocator, 3);
+                allocator_free(allocator, req);
                 return NULL;
             }
         }

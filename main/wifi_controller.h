@@ -44,15 +44,7 @@ uint8_t beacon_frame[] = {
 #define SRCADDR_OFFSET 10
 #define BSSID_OFFSET 16
 #define SEQNUM_OFFSET 22
-char *rick_ssids[] = {
-	"N1",
-	"N2",
-	"N3",
-	"N4",
-	"N5",
-	"N6",
-};
-#define TOTAL_LINES (sizeof(rick_ssids) / sizeof(char *))
+
 
 int ieee80211_raw_frame_sanity_check(int32_t arg, int32_t arg2, int32_t arg3){
     return 0;

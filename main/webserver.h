@@ -26,7 +26,7 @@ void handle_scan(allocator_t* allocator, int client_sock) {
     }
     printf("JSON to send: %s \n", json);
     http_send_json_response(client_sock, json);
-    allocator_free_n(allocator, 2);
+    allocator_free(allocator, records);
 }
 
 void handle_attack(allocator_t* allocator, http_request_t* req, int client_sock) {
@@ -199,7 +199,7 @@ void start_webserver(){
             continue;
         }
         buffer[len] = 0;
-        allocator_realloc_type(&allocator, char, len+1);
+        allocator_realloc_type(&allocator, buffer, char, len+1);
 
         ESP_LOGI("WebServer", "Parsing request...");
         http_request_t* req = http_request_parse(&allocator, buffer);
