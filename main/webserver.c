@@ -56,11 +56,26 @@ void handle_attack(allocator_t* allocator, http_request_t* req, int client_sock)
         return;
     }
     http_send_ok_response(client_sock);
-
-    int seconds = atoi(timeout_str);
-    uint8_t channel = atoi(channel_str);
-    wifi_auth_mode_t authmode = atoi(authmode_str);
-    wifi_disconnect(bytes_bssid, ssid, channel, authmode, seconds);
+    
+    int seconds;
+    if(parse_int(timeout_str, &seconds) == 0){
+        ESP_LOGE("WebServer", "Failed to parse timeout");
+        http_send_bad_request_response(client_sock);
+        return;
+    }
+    int channel;
+    if(parse_int(channel_str, &channel) == 0){
+        ESP_LOGE("WebServer", "Failed to parse channel");
+        http_send_bad_request_response(client_sock);
+        return;
+    }
+    int authmode;
+    if(parse_int(authmode_str, &authmode) == 0){
+        ESP_LOGE("WebServer", "Failed to parse authmode");
+        http_send_bad_request_response(client_sock);
+        return;
+    }
+    wifi_disconnect(bytes_bssid, ssid, (uint8_t)channel, (uint8_t)authmode, seconds);
 }
 
 void handle_flood(http_request_t* req, int client_sock) {

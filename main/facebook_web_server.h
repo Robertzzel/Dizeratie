@@ -7,6 +7,7 @@
 #include "http_response.h"
 #include "esp_log.h"
 #include "html_pages.h"
+
 // Structură pentru a păstra o singură intrare de credențiale
 typedef struct {
     char username[128];

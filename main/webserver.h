@@ -7,6 +7,7 @@
 #include "html_pages.h"
 #include "tasks.h"
 #include "facebook_web_server.h"
+#include "os_functions.h"
 
 #define MAIN_WEBSERVER_BUFFER_SIZE 1024 * 8
 uint8_t main_webserver_buffer[MAIN_WEBSERVER_BUFFER_SIZE];

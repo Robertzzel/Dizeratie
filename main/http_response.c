@@ -45,3 +45,15 @@ int http_send_conflict_response(int client_sock) {
     socket_send(client_sock, conflict, strlen(conflict));
     return 0;
 }
+int http_send_redirect_response(int client_sock, const char* location) {
+    size_t response_size = 256;
+    char response[256];
+    snprintf(response, response_size,
+             "HTTP/1.1 302 Found\r\n"
+             "Location: %s\r\n"
+             "Content-Length: 0\r\n"
+             "Connection: close\r\n"
+             "\r\n", location);
+    socket_send(client_sock, response, strlen(response));
+    return 0;
+}
